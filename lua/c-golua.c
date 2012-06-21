@@ -68,12 +68,12 @@ void clua_pushgofunction(lua_State* L, unsigned int fid)
 
 void clua_pushlightinteger(lua_State* L, int n)
 {
-  lua_pushlightuserdata(L, (void*)(uintptr_t)n);
+  lua_pushlightuserdata(L, (void*)(GoUintptr)n);
 }
 
-uintptr_t clua_tolightinteger(lua_State *L, unsigned int index)
+GoUintptr clua_tolightinteger(lua_State *L, unsigned int index)
 {
-  return (uintptr_t)lua_touserdata(L, index);
+  return (GoUintptr)lua_touserdata(L, index);
 }
 
 void clua_setgostate(lua_State* L, GoInterface gi)
@@ -156,7 +156,7 @@ GoInterface clua_atpanic(lua_State* L, unsigned int panicf_id)
 	else
 	{
 		//TODO: technically UB, function ptr -> non function ptr
-		return golua_cfunctiontointerface((uintptr *)pf);
+		return golua_cfunctiontointerface((GoUintptr *)pf);
 	}
 }
 
@@ -167,7 +167,7 @@ int clua_callluacfunc(lua_State* L, lua_CFunction f)
 
 void* allocwrapper(void* ud, void *ptr, size_t osize, size_t nsize)
 {
-	return (void*)golua_callallocf((uintptr)ud,(uintptr)ptr,osize,nsize);
+	return (void*)golua_callallocf((GoUintptr)ud,(GoUintptr)ptr,osize,nsize);
 }
 
 lua_State* clua_newstate(void* goallocf)

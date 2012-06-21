@@ -1,8 +1,10 @@
 Go Bindings for the lua C API
 
+Fork from: https://github.com/aarzilli/golua
+
 Simplest way to install:
 
-#go get -u github.com/aarzilli/golua/lua
+#go get -u github.com/ruitao/golua/lua
 
 Will work as long as pkg-config knows about lua.
 
