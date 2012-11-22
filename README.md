@@ -21,7 +21,7 @@ QUICK START
 Create a new Virtual Machine with:
 
 ```go
-L := lua.newState()
+L := lua.NewState()
 L.OpenLibs()
 defer L.Close()
 ```
