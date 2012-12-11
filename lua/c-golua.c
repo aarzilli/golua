@@ -104,6 +104,18 @@ void clua_pushgofunction(lua_State* L, unsigned int fid)
 	lua_setmetatable(L, -2);
 }
 
+static int callback_c (lua_State* L)
+{
+	int fid = clua_togofunction(L,lua_upvalueindex(1));
+	GoInterface *gi = clua_getgostate(L);
+	return golua_callgofunction(*gi,fid);
+}
+
+void clua_pushcallback(lua_State* L)
+{
+	lua_pushcclosure(L,callback_c,1);
+}
+
 void clua_pushgostruct(lua_State* L, unsigned int iid)
 {
 	unsigned int* iidptr = (unsigned int *)lua_newuserdata(L, sizeof(unsigned int));

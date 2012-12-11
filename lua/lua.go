@@ -91,6 +91,12 @@ func (L *State) PushGoFunction(f LuaGoFunction) {
 	C.clua_pushgofunction(L.s, C.uint(fid))
 }
 
+// Like lua_pushcclosure pushes a new Go closure onto the stack
+func (L *State) PushGoCallback(f LuaGoFunction) {
+	L.PushGoFunction(f) // leaves Go function userdata on stack
+	C.clua_pushcallback(L.s)
+}
+
 // Pushes a Go struct onto the stack as user data.
 //
 // The user data will be rigged so that lua code can access and change to public members of simple types directly
