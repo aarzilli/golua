@@ -519,6 +519,12 @@ func (L *State) ToString(index int) string {
 	return C.GoString(C.lua_tolstring(L.s, C.int(index), &size))
 }
 
+// lua_tolstring
+func (L *State) ToLstring(index int, s int) string {
+    size := C.size_t(s)
+	return C.GoStringN(C.lua_tolstring(L.s, C.int(index), &size), C.int(s))
+}
+
 // lua_tointeger
 func (L *State) ToInteger(index int) int {
 	return int(C.lua_tointeger(L.s, C.int(index)))
