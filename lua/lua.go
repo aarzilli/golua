@@ -8,7 +8,9 @@ package lua
 /*
 #cgo CFLAGS: -Ilua
 #cgo llua LDFLAGS: -llua
+#cgo llua pkg-config: --define-variable=prefix=. lua
 #cgo linux,!llua LDFLAGS: -llua5.1
+#cgo linux,!llua pkg-config: --define-variable=prefix=. lua5.1
 #cgo darwin LDFLAGS: -llua
 #cgo freebsd LDFLAGS: -llua
 
