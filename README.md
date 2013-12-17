@@ -10,6 +10,26 @@ If your linux system uses "lua" as the shared object name for lua (for example, 
 
 	# go get -u -tags llua github.com/aarzilli/golua/lua
 
+For installing lua5.1 from source code on linux platform:
+
+    # wget http://www.lua.org/ftp/lua-5.1.tar.gz
+    # tar xzvf lua-5.1.tar.gz
+    # cd lua-5.1
+    # make linux
+    # make linux install
+
+You must use pkg-config to link your configuration to cgo, otherwise it will have some complaints.
+1. Modify the package-configuration (pc) file: lua-5.1/etc/lua.pc
+Replace this line:
+Libs: -L${libdir} -llua -lm
+to:
+Libs: -L${libdir} -llua -lm -ldl
+
+2. export to PKG_CONFIG_PATH
+export PKG_CONFIG_PATH=<your-path>/lua-5.1/etc/
+
+3. go build github.com/aarzilli/golua/lua -tags llua, and then everything works well.
+
 
 You can then try to run the examples:
 
