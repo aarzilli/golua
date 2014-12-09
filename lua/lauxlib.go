@@ -9,8 +9,8 @@ import "C"
 import "unsafe"
 
 type LuaError struct {
-	code int
-	message string
+	code       int
+	message    string
 	stackTrace []LuaStackEntry
 }
 
@@ -95,7 +95,7 @@ func (L *State) DoFile(filename string) error {
 	if r := L.LoadFile(filename); r != 0 {
 		return &LuaError{r, L.ToString(-1), L.StackTrace()}
 	}
-	return L.Call(0, LUA_MULTRET);
+	return L.Call(0, LUA_MULTRET)
 }
 
 // Executes the string, returns nil for no errors or the lua error string on failure
@@ -212,4 +212,3 @@ func (L *State) Unref(t int, ref int) {
 func (L *State) Where(lvl int) {
 	C.luaL_where(L.s, C.int(lvl))
 }
-

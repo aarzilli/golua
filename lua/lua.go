@@ -25,8 +25,8 @@ import "unsafe"
 import "fmt"
 
 type LuaStackEntry struct {
-	Name string
-	Source string
+	Name        string
+	Source      string
 	ShortSource string
 	CurrentLine int
 }
@@ -59,9 +59,9 @@ func (L *State) getFreeIndex() (index uint, ok bool) {
 	freelen := len(L.freeIndices)
 	//if there exist entries in the freelist
 	if freelen > 0 {
-		i := L.freeIndices[freelen-1]      //get index
+		i := L.freeIndices[freelen-1] //get index
 		//fmt.Printf("Free indices before: %v\n", L.freeIndices)
-		L.freeIndices = L.freeIndices[0:freelen-1] //'pop' index from list
+		L.freeIndices = L.freeIndices[0 : freelen-1] //'pop' index from list
 		//fmt.Printf("Free indices after: %v\n", L.freeIndices)
 		return i, true
 	}
@@ -119,7 +119,7 @@ func (L *State) PushGoFunction(f LuaGoFunction) {
 //
 // except this wouldn't work because pushing a go function results in user data not a cfunction
 func (L *State) SetMetaMethod(methodName string, f LuaGoFunction) {
-	L.PushGoFunction(f) // leaves Go function userdata on stack
+	L.PushGoFunction(f)      // leaves Go function userdata on stack
 	C.clua_pushcallback(L.s) // wraps the userdata object with a closure making it into a function
 	L.SetField(-2, methodName)
 }
@@ -175,20 +175,20 @@ func (L *State) pcall(nargs, nresults, errfunc int) int {
 }
 
 func (L *State) callEx(nargs, nresults int, catch bool) (err error) {
-	if (catch) {
+	if catch {
 		defer func() {
 			if err2 := recover(); err2 != nil {
 				if _, ok := err2.(error); ok {
 					err = err2.(error)
 				}
-				return;
+				return
 			}
 		}()
 	}
 
 	L.GetGlobal(C.GOLUA_DEFAULT_MSGHANDLER)
 	// We must record where we put the error handler in the stack otherwise it will be impossible to remove after the pcall when nresults == LUA_MULTRET
-	erridx := L.GetTop()-nargs-1
+	erridx := L.GetTop() - nargs - 1
 	L.Insert(erridx)
 	r := L.pcall(nargs, nresults, erridx)
 	L.Remove(erridx)
@@ -307,7 +307,9 @@ func (L *State) IsNumber(index int) bool { return C.lua_isnumber(L.s, C.int(inde
 func (L *State) IsString(index int) bool { return C.lua_isstring(L.s, C.int(index)) == 1 }
 
 // lua_istable
-func (L *State) IsTable(index int) bool { return LuaValType(C.lua_type(L.s, C.int(index))) == LUA_TTABLE }
+func (L *State) IsTable(index int) bool {
+	return LuaValType(C.lua_type(L.s, C.int(index))) == LUA_TTABLE
+}
 
 // lua_isthread
 func (L *State) IsThread(index int) bool {
@@ -499,17 +501,25 @@ func (L *State) ToBoolean(index int) bool {
 
 // Returns the value at index as a Go function (it must be something pushed with PushGoFunction)
 func (L *State) ToGoFunction(index int) (f LuaGoFunction) {
-	if !L.IsGoFunction(index) { return nil }
+	if !L.IsGoFunction(index) {
+		return nil
+	}
 	fid := C.clua_togofunction(L.s, C.int(index))
-	if fid < 0 { return nil }
+	if fid < 0 {
+		return nil
+	}
 	return L.registry[fid].(LuaGoFunction)
 }
 
 // Returns the value at index as a Go Struct (it must be something pushed with PushGoStruct)
 func (L *State) ToGoStruct(index int) (f interface{}) {
-	if !L.IsGoStruct(index) { return nil }
+	if !L.IsGoStruct(index) {
+		return nil
+	}
 	fid := C.clua_togostruct(L.s, C.int(index))
-	if fid < 0 { return nil }
+	if fid < 0 {
+		return nil
+	}
 	return L.registry[fid]
 }
 
@@ -627,7 +637,7 @@ func (L *State) StackTrace() []LuaStackEntry {
 		}
 		ss := string(ssb)
 
-		r = append(r, LuaStackEntry{ C.GoString(d.name), C.GoString(d.source), ss, int(d.currentline) })
+		r = append(r, LuaStackEntry{C.GoString(d.name), C.GoString(d.source), ss, int(d.currentline)})
 	}
 
 	return r
@@ -639,9 +649,9 @@ func (L *State) RaiseError(msg string) {
 	if len(st) >= 1 {
 		prefix = fmt.Sprintf("%s:%d: ", st[1].ShortSource, st[1].CurrentLine)
 	}
-	panic(&LuaError{ 0, prefix + msg, st })
+	panic(&LuaError{0, prefix + msg, st})
 }
 
 func (L *State) NewError(msg string) *LuaError {
-	return &LuaError{ 0, msg, L.StackTrace() }
+	return &LuaError{0, msg, L.StackTrace()}
 }
