@@ -104,6 +104,14 @@ func (L *State) PushGoFunction(f LuaGoFunction) {
 	C.clua_pushgofunction(L.s, C.uint(fid))
 }
 
+// PushGoClosure pushes a lua.LuaGoFunction to the stack wrapped in a Closure.
+// this permits the go function to reflect lua type 'function' when checking with type()
+// this implements behaviour akin to lua_pushcfunction() in lua C API.
+func (L *State) PushGoClosure(f LuaGoFunction) {
+    L.PushGoFunction(f) // leaves Go function userdata on stack
+	C.clua_pushcallback(L.s) // wraps the userdata object with a closure making it into a function
+}
+
 // Sets a metamethod to execute a go function
 //
 // The code:
