@@ -208,6 +208,9 @@ func golua_interface_index_callback(gostateindex uintptr, iid uint, field_name *
 	case reflect.Float64:
 		L.PushNumber(fval.Float())
 		return 1
+	case reflect.Struct:
+		L.PushGoStruct(fval.Addr().Interface())
+		return 1
 	}
 
 	L.PushString("Unsupported type of field: " + fval.Type().String())
