@@ -97,6 +97,90 @@ err := L.Call(0, 0)
 …
 ```
 
+Benchmarks
+---------------------
+fib(35)
+
+
+MacBook Pro (Retina, 15-inch, Mid 2015)
+2.5 GHz Intel Core i7
+16 GB 1600 MHz DDR3
+
+macOS Sierra 10.12.1 
+
+
+* lua
+```lua
+local function fib(n)
+    if n < 2 then return n end
+    return fib(n - 2) + fib(n - 1)
+end
+print(fib(35))
+```
+```
+╰─ time lua fib.lua
+lua fib.lua  1.51s user 0.00s system 99% cpu 1.512 total
+╰─ time lua fib.lua
+lua fib.lua  1.49s user 0.00s system 99% cpu 1.497 total
+╰─ time lua fib.lua
+lua fib.lua  1.56s user 0.01s system 99% cpu 1.571 total
+```
+
+* [gopher-lua](https://github.com/yuin/gopher-lua)
+```go
+const fib = `
+local function fib(n)
+    if n < 2 then return n end
+    return fib(n - 2) + fib(n - 1)
+end
+print(fib(35))
+`
+func main() {
+    L := lua.NewState()
+    defer L.Close()
+    if err := L.DoString(fib); err != nil {
+        panic(err)
+    }
+}
+```
+```
+╰─ time ./gopherlua
+./gopherlua  3.99s user 0.01s system 99% cpu 4.019 total
+╰─ time ./gopherlua
+./gopherlua  4.01s user 0.01s system 99% cpu 4.022 total
+╰─ time ./gopherlua
+./gopherlua  4.19s user 0.01s system 99% cpu 4.212 total
+```
+
+* golua
+```go
+const fib = `
+local function fib(n)
+    if n < 2 then return n end
+    return fib(n - 2) + fib(n - 1)
+end
+print(fib(35))
+`
+func main() {
+    L := lua.NewState()
+    defer L.Close()
+    L.OpenLibs()
+    if err := L.DoString(fib); err != nil {
+		panic(err)
+    }
+}
+```
+```
+╰─ time ./golua
+./golua  1.54s user 0.00s system 99% cpu 1.552 total
+╰─ time ./golua
+./golua  1.59s user 0.01s system 99% cpu 1.604 total
+╰─ time ./golua
+./golua  1.62s user 0.01s system 99% cpu 1.632 total
+```
+
+
+
 ON THREADS AND COROUTINES
 ---------------------
 
