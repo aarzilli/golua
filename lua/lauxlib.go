@@ -166,6 +166,9 @@ func (L *State) NewMetaTable(tname string) bool {
 // luaL_newstate
 func NewState() *State {
 	ls := (C.luaL_newstate())
+	if ls == nil {
+		return nil
+	}
 	L := newState(ls)
 	return L
 }
