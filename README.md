@@ -116,8 +116,8 @@ To link with [luajit-2.0.x](http://luajit.org/luajit.html), you can use CGO_CFLA
 
 ```
 $ CGO_CFLAGS=`pkg-config luajit --cflags`
-$ CGO_LDFLAGS=`pkg-config luajit --libs`
-$ go get -f -u github.com/aarzilli/golua/lua
+$ CGO_LDFLAGS=`pkg-config luajit --libs-only-L`
+$ go get -f -u -tags luajit github.com/aarzilli/golua/lua
 ```
 
 CONTRIBUTORS
