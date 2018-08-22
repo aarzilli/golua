@@ -7,13 +7,8 @@ package lua
 
 /*
 #cgo CFLAGS: -I ${SRCDIR}/lua
-#cgo llua LDFLAGS: -llua
-#cgo luaa LDFLAGS: -llua -lm -ldl
-#cgo luajit LDFLAGS: -lluajit-5.1
-#cgo linux,!llua,!luaa,!luajit LDFLAGS: -llua5.1
-#cgo darwin,!luaa,!luajit pkg-config: lua5.1
-#cgo freebsd,!luaa,!luajit LDFLAGS: -llua-5.1
-#cgo windows,!llua,!luajit LDFLAGS: -L${SRCDIR} -llua -lmingwex -lmingw32
+#cgo windows LDFLAGS: -L${SRCDIR}/libs -lmingw_lua53 -lm
+#cgo linux LDFLAGS: -L${SRCDIR}/libs -llinux_luajit -lm -ldl
 
 #include <lua.h>
 #include <stdlib.h>
@@ -77,9 +72,9 @@ func (L *State) register(f interface{}) uint {
 		index = uint(len(L.registry))
 		//reallocate backing array if necessary
 		if index+1 > uint(cap(L.registry)) {
-			newcap := cap(L.registry)*2
+			newcap := cap(L.registry) * 2
 			if index+1 > uint(newcap) {
-				newcap = int(index+1)
+				newcap = int(index + 1)
 			}
 			newSlice := make([]interface{}, index, newcap)
 			copy(newSlice, L.registry)
