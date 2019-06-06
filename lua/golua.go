@@ -35,6 +35,9 @@ type State struct {
 
 	// Freelist for funcs indices, to allow for freeing
 	freeIndices []uint
+
+	// lastErr stores the last error encountered by the state
+	lastErr *LuaError
 }
 
 var goStates map[uintptr]*State
@@ -260,10 +263,12 @@ func golua_callallocf(fp uintptr, ptr uintptr, osize uint, nsize uint) uintptr {
 	return uintptr((*((*Alloc)(unsafe.Pointer(fp))))(unsafe.Pointer(ptr), osize, nsize))
 }
 
-//export go_panic_msghandler
-func go_panic_msghandler(gostateindex uintptr, z *C.char) {
+//export go_err_msghandler
+func go_err_msghandler(gostateindex uintptr, z *C.char) {
 	L := getGoState(gostateindex)
-	s := C.GoString(z)
-
-	panic(&LuaError{LUA_ERRERR, s, L.StackTrace()})
+	L.lastErr = &LuaError{
+		code:       LUA_ERRERR,
+		message:    C.GoString(z),
+		stackTrace: L.StackTrace(),
+	}
 }

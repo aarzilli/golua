@@ -34,7 +34,7 @@ type LuaStackEntry struct {
 }
 
 func newState(L *C.lua_State) *State {
-	newstate := &State{L, 0, make([]interface{}, 0, 8), make([]uint, 0, 8)}
+	newstate := &State{L, 0, make([]interface{}, 0, 8), make([]uint, 0, 8), nil}
 	registerGoState(newstate)
 	C.clua_setgostate(L, C.size_t(newstate.Index))
 	C.clua_initstate(L)
@@ -77,9 +77,9 @@ func (L *State) register(f interface{}) uint {
 		index = uint(len(L.registry))
 		//reallocate backing array if necessary
 		if index+1 > uint(cap(L.registry)) {
-			newcap := cap(L.registry)*2
+			newcap := cap(L.registry) * 2
 			if index+1 > uint(newcap) {
-				newcap = int(index+1)
+				newcap = int(index + 1)
 			}
 			newSlice := make([]interface{}, index, newcap)
 			copy(newSlice, L.registry)
@@ -204,7 +204,8 @@ func (L *State) callEx(nargs, nresults int, catch bool) (err error) {
 	r := L.pcall(nargs, nresults, erridx)
 	L.Remove(erridx)
 	if r != 0 {
-		err = &LuaError{r, L.ToString(-1), L.StackTrace()}
+		err = L.lastErr
+		L.lastErr = nil
 		if !catch {
 			panic(err)
 		}
@@ -353,7 +354,7 @@ func (L *State) NewThread() *State {
 	//TODO: should have same lists as parent
 	//		but may complicate gc
 	s := C.lua_newthread(L.s)
-	return &State{s, 0, nil, nil}
+	return &State{s, 0, nil, nil, nil}
 }
 
 // lua_next
