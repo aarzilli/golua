@@ -203,7 +203,7 @@ func (L *State) callEx(nargs, nresults int, catch bool) (err error) {
 	L.Insert(erridx)
 	r := L.pcall(nargs, nresults, erridx)
 	L.Remove(erridx)
-	if r != 0 {
+	if r != 0 || L.lastErr != nil {
 		err = L.lastErr
 		L.lastErr = nil
 		if !catch {
@@ -677,4 +677,8 @@ func (L *State) RaiseError(msg string) {
 
 func (L *State) NewError(msg string) *LuaError {
 	return &LuaError{0, msg, L.StackTrace()}
+}
+
+func (L *State) SetNewLastErr(err error) {
+	L.lastErr = L.NewError(err.Error())
 }

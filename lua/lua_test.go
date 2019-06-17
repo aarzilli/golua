@@ -78,6 +78,17 @@ func TestCheckStringFail(t *testing.T) {
 	}
 }
 
+func TestCheckStringFail2(t *testing.T) {
+	L := NewState()
+	L.OpenLibs()
+	defer L.Close()
+
+	L.PushString("abc")
+	if s := L.CheckString(-1); s != "abc" {
+		t.Fatal("CheckString failed\n")
+	}
+}
+
 func TestPCallHidden(t *testing.T) {
 	L := NewState()
 	L.OpenLibs()

@@ -1,12 +1,22 @@
 package lua
 
-//#include <lua.h>
-//#include <lauxlib.h>
-//#include <lualib.h>
-//#include <stdlib.h>
-//#include "golua.h"
+// #include <lua.h>
+// #include <lauxlib.h>
+// #include <lualib.h>
+// #include <stdlib.h>
+// #include "golua.h"
+//
+// int p_luaL_checklstring(lua_State *L)
+// {
+//     int narg = lua_tointeger(L, lua_upvalueindex(1));
+//     const char *x = luaL_checklstring(L, narg, NULL);
+//     lua_pushstring(L, x);
+//     return 1;
+// }
 import "C"
-import "unsafe"
+import (
+	"unsafe"
+)
 
 type LuaError struct {
 	code       int
@@ -67,8 +77,17 @@ func (L *State) CheckNumber(narg int) float64 {
 
 // luaL_checkstring
 func (L *State) CheckString(narg int) string {
-	var length C.size_t
-	return C.GoString(C.luaL_checklstring(L.s, C.int(narg), &length))
+	// Offset narg value by 3 to account for narg,
+	// p_luaL_checklstring, and the Lua state.
+	C.lua_pushinteger(L.s, C.long(narg-3))
+	C.lua_pushcclosure(L.s, (*[0]byte)(C.p_luaL_checklstring), C.int(1))
+	C.lua_pushlightuserdata(L.s, unsafe.Pointer(L.s))
+	if err := L.callEx(1, 1, true); err != nil {
+		L.SetNewLastErr(err)
+		panic("1")
+	}
+	defer L.Pop(1)
+	return C.GoString(C.lua_tolstring(L.s, -1, nil))
 }
 
 // luaL_checkoption
