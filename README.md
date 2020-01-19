@@ -142,6 +142,7 @@ SEE ALSO
 ---------------------
 
 - [Luar](https://github.com/stevedonovan/luar/) is a reflection layer on top of golua API providing a simplified way to publish go functions to a Lua VM.
+- [lunatico](https://github.com/fiatjaf/lunatico) is a wrapper and reflection layer that allows you to push and read Go values to a Lua VM with understanding the Lua stack.
 - [Golua unicode](https://github.com/Ambrevar/golua) is an extension library that adds unicode support to golua and replaces lua regular expressions with re2.
 
 Licensing
