@@ -1,4 +1,4 @@
-//+build lua52
+//+build lua54
 
 package lua
 
@@ -13,6 +13,14 @@ typedef struct _chunk {
 	char *buffer; // chunk data
 	char* toread; // chunk to read
 } chunk;
+
+LUA_API void *lua_newuserdata (lua_State *L, size_t size) {
+    return lua_newuserdatauv(L, size, 1);
+}
+
+LUA_API int (lua_gc_compat) (lua_State *L, int what, int data) {
+    return lua_gc(L, what, data);
+}
 
 static const char * reader (lua_State *L, void *ud, size_t *sz) {
 	chunk *ck = (chunk *)ud;
@@ -97,12 +105,6 @@ void clua_opendebug(lua_State *L)
 	lua_pop(L, 1);
 }
 
-void clua_openbit32(lua_State *L)
-{
-	luaL_requiref(L, "bit32", &luaopen_bit32, 1);
-	lua_pop(L, 1);
-}
-
 // dump function chunk from luaL_loadstring
 int dump_chunk (lua_State *L) {
 	luaL_Buffer b;
@@ -110,7 +112,7 @@ int dump_chunk (lua_State *L) {
 	lua_settop(L, -1);
 	luaL_buffinit(L,&b);
 	int errno;
-	errno = lua_dump(L, writer, &b);
+	errno = lua_dump(L, writer, &b, 0);
 	if (errno != 0){
 	return luaL_error(L, "unable to dump given function, errno:%d", errno);
 	}
@@ -122,7 +124,7 @@ import "C"
 
 import "unsafe"
 
-func luaToInteger(s *C.lua_State, n C.int) C.long {
+func luaToInteger(s *C.lua_State, n C.int) C.longlong {
 	return C.lua_tointegerx(s, n, nil)
 }
 
@@ -176,7 +178,7 @@ func (L *State) GetGlobal(name string) {
 
 // lua_resume
 func (L *State) Resume(narg int) int {
-	return int(C.lua_resume(L.s, nil, C.int(narg)))
+	return int(C.lua_resume(L.s, nil, C.int(narg), nil))
 }
 
 // lua_setglobal
@@ -191,40 +193,37 @@ func (L *State) OpenDebug() {
 	C.clua_opendebug(L.s)
 }
 
-// Calls luaopen_bit32
-func (L *State) OpenBit32() {
-	C.clua_openbit32(L.s)
-}
-
 // Calls luaopen_coroutine
 func (L *State) OpenCoroutine() {
 	C.clua_opencoroutine(L.s)
 }
 
 // lua_insert
-func (L *State) Insert(index int) { C.lua_insert(L.s, C.int(index)) }
+func (L *State) Insert(index int) { C.lua_rotate(L.s, C.int(index), 1) }
 
 // lua_remove
 func (L *State) Remove(index int) {
-	C.lua_remove(L.s, C.int(index))
+	C.lua_rotate(L.s, C.int(index), -1)
+	C.lua_settop(L.s, C.int(-2))
 }
 
 // lua_replace
 func (L *State) Replace(index int) {
-	C.lua_replace(L.s, C.int(index))
+	C.lua_copy(L.s, -1, C.int(index))
+	C.lua_settop(L.s, -2)
 }
 
 // lua_rawgeti
 func (L *State) RawGeti(index int, n int) {
-	C.lua_rawgeti(L.s, C.int(index), C.int(n))
+	C.lua_rawgeti(L.s, C.int(index), C.longlong(n))
 }
 
 // lua_rawseti
 func (L *State) RawSeti(index int, n int) {
-	C.lua_rawseti(L.s, C.int(index), C.int(n))
+	C.lua_rawseti(L.s, C.int(index), C.longlong(n))
 }
 
 // lua_gc
 func (L *State) GC(what, data int) int {
-    return int(C.lua_gc(L.s, C.int(what), C.int(data)))
+    return int(C.lua_gc_compat(L.s, C.int(what), C.int(data)))
 }

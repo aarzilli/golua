@@ -1,4 +1,4 @@
-//+build !lua52,!lua53
+//+build !lua52,!lua53,!lua54
 
 package lua
 
@@ -201,4 +201,9 @@ func (L *State) RawGeti(index int, n int) {
 // lua_rawseti
 func (L *State) RawSeti(index int, n int) {
 	C.lua_rawseti(L.s, C.int(index), C.int(n))
+}
+
+// lua_gc
+func (L *State) GC(what, data int) int {
+    return int(C.lua_gc(L.s, C.int(what), C.int(data)))
 }

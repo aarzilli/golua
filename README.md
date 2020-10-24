@@ -25,7 +25,7 @@ If this doesn't work `-tags luadash5.1` can be used to force `lua-5.1`, and `-ta
 
 If you want to statically link to liblua.a you can do that with `-tags luaaa`. Luajit can also be used by specifying `-tags luajit`.
 
-The library uses lua5.1 by default but also supports lua5.2 by specifying `-tags lua52` and lua5.3 by specifying `-tags lua53`.
+The library uses lua5.1 by default but also supports lua5.2 by specifying `-tags lua52`, lua5.3 by specifying `-tags lua53`, and lua5.4 by specifying `-tags lua54`.
 
 QUICK START
 ---------------------
@@ -111,7 +111,7 @@ ON THREADS AND COROUTINES
 ODDS AND ENDS
 ---------------------
 
-* If you want to build against lua5.2 or lua5.3 use the build tags lua52 or lua53
+* If you want to build against lua5.2, lua5.3, or lua5.4 use the build tags lua52, lua53, or lua54 respectively.
 * Compiling from source yields only a static link library (liblua.a), you can either produce the dynamic link library on your own or use the `luaa` build tag.
 
 LUAJIT
@@ -142,6 +142,7 @@ CONTRIBUTORS
 * Admin36
 * Pierre Neidhardt (@Ambrevar)
 * HuangWei (@huangwei1024)
+* Adam Saponara
 
 SEE ALSO
 ---------------------

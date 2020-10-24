@@ -1,9 +1,10 @@
 package lua
 
 /*
-#cgo !lua52,!lua53 CFLAGS: -I ${SRCDIR}/lua51
+#cgo !lua52,!lua53,!lua54 CFLAGS: -I ${SRCDIR}/lua51
 #cgo lua52 CFLAGS: -I ${SRCDIR}/lua52
 #cgo lua53 CFLAGS: -I ${SRCDIR}/lua53
+#cgo lua54 CFLAGS: -I ${SRCDIR}/lua54
 
 #include <lua.h>
 #include <lualib.h>
