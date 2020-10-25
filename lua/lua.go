@@ -328,8 +328,8 @@ func (L *State) IsThread(index int) bool {
 func (L *State) IsUserdata(index int) bool { return C.lua_isuserdata(L.s, C.int(index)) == 1 }
 
 // Creates a new lua interpreter state with the given allocation function
-func NewStateAlloc(f Alloc) *State {
-	ls := C.clua_newstate(unsafe.Pointer(&f))
+func NewStateAlloc(f *Alloc) *State {
+	ls := C.clua_newstate(unsafe.Pointer(f))
 	return newState(ls)
 }
 
@@ -429,8 +429,8 @@ func (L *State) Register(name string, f LuaGoFunction) {
 }
 
 // lua_setallocf
-func (L *State) SetAllocf(f Alloc) {
-	C.clua_setallocf(L.s, unsafe.Pointer(&f))
+func (L *State) SetAllocf(f *Alloc) {
+	C.clua_setallocf(L.s, unsafe.Pointer(f))
 }
 
 // lua_setfield

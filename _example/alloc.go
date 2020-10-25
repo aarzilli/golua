@@ -39,11 +39,11 @@ func main() {
 
 	//refHolder = make([][]byte,0,500);
 
-	L := lua.NewStateAlloc(AllocatorF)
+	L := lua.NewStateAlloc(&AllocatorF)
 	defer L.Close()
 	L.OpenLibs()
 
-	L.SetAllocf(A2)
+	L.SetAllocf(&A2)
 
 	for i := 0; i < 10; i++ {
 		L.GetGlobal("print")
