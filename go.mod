@@ -1,3 +1,3 @@
-module github.com/SuperRxan/golua
+module github.com/aarzilli/golua
 
 go 1.15
