@@ -48,7 +48,7 @@ type LuaStackEntry struct {
 }
 
 func newState(L *C.lua_State) *State {
-	newstate := &State{L, 0, make([]interface{}, 0, 8), make([]uint, 0, 8)}
+	newstate := &State{L, 0, make([]interface{}, 0, 8), make([]uint, 0, 8), nil}
 	registerGoState(newstate)
 	C.clua_setgostate(L, C.size_t(newstate.Index))
 	C.clua_initstate(L)
@@ -328,9 +328,11 @@ func (L *State) IsThread(index int) bool {
 func (L *State) IsUserdata(index int) bool { return C.lua_isuserdata(L.s, C.int(index)) == 1 }
 
 // Creates a new lua interpreter state with the given allocation function
-func NewStateAlloc(f *Alloc) *State {
-	ls := C.clua_newstate(unsafe.Pointer(f))
-	return newState(ls)
+func NewStateAlloc(f Alloc) *State {
+	ls := C.clua_newstate(unsafe.Pointer(&f))
+	L := newState(ls)
+	L.allocfn = &f
+	return L
 }
 
 // lua_newtable
@@ -344,7 +346,7 @@ func (L *State) NewThread() *State {
 	//TODO: should have same lists as parent
 	//		but may complicate gc
 	s := C.lua_newthread(L.s)
-	return &State{s, 0, nil, nil}
+	return &State{s, 0, nil, nil, nil}
 }
 
 // lua_next
@@ -429,8 +431,9 @@ func (L *State) Register(name string, f LuaGoFunction) {
 }
 
 // lua_setallocf
-func (L *State) SetAllocf(f *Alloc) {
-	C.clua_setallocf(L.s, unsafe.Pointer(f))
+func (L *State) SetAllocf(f Alloc) {
+	L.allocfn = &f
+	C.clua_setallocf(L.s, unsafe.Pointer(L.allocfn))
 }
 
 // lua_setfield

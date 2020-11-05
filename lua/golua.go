@@ -37,6 +37,9 @@ type State struct {
 
 	// Freelist for funcs indices, to allow for freeing
 	freeIndices []uint
+
+	// User self defined memory alloc func for the lua State
+	allocfn *Alloc
 }
 
 var goStates map[uintptr]*State
