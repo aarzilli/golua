@@ -6,26 +6,30 @@
 package lua
 
 /*
-#cgo !lua52,!lua53 CFLAGS: -I ${SRCDIR}/lua51
+#cgo !lua52,!lua53,!lua54 CFLAGS: -I ${SRCDIR}/lua51
 #cgo lua52 CFLAGS: -I ${SRCDIR}/lua52
 #cgo lua53 CFLAGS: -I ${SRCDIR}/lua53
+#cgo lua54 CFLAGS: -I ${SRCDIR}/lua54
 #cgo llua LDFLAGS: -llua
 
 #cgo luaa LDFLAGS: -llua -lm -ldl
 #cgo luajit LDFLAGS: -lluajit-5.1
 #cgo lluadash5.1 LDFLAGS: -llua-5.1
 
-#cgo linux,!lua52,!lua53,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua5.1
+#cgo linux,!lua52,!lua53,!lua54,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua5.1
 #cgo linux,lua52,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua5.2
 #cgo linux,lua53,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua5.3
+#cgo linux,lua54,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua5.4 -lm
 
-#cgo darwin,!lua52,!lua53,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.1
+#cgo darwin,!lua52,!lua53,!lua54,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.1
 #cgo darwin,lua52,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.2
 #cgo darwin,lua53,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.3
+#cgo darwin,lua54,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.4 m
 
-#cgo freebsd,!lua52,!lua53,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua-5.1
+#cgo freebsd,!lua52,!lua53,!lua54,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua-5.1
 #cgo freebsd,lua52,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua-5.2
 #cgo freebsd,lua53,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua-5.3
+#cgo freebsd,lua54,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua-5.4 -lm
 
 #cgo windows,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -L${SRCDIR} -llua -lmingwex -lmingw32
 
@@ -48,7 +52,7 @@ type LuaStackEntry struct {
 }
 
 func newState(L *C.lua_State) *State {
-	newstate := &State{L, 0, make([]interface{}, 0, 8), make([]uint, 0, 8)}
+	newstate := &State{L, 0, make([]interface{}, 0, 8), make([]uint, 0, 8), nil}
 	registerGoState(newstate)
 	C.clua_setgostate(L, C.size_t(newstate.Index))
 	C.clua_initstate(L)
@@ -253,9 +257,6 @@ func (L *State) CreateTable(narr int, nrec int) {
 	C.lua_createtable(L.s, C.int(narr), C.int(nrec))
 }
 
-// lua_gc
-func (L *State) GC(what, data int) int { return int(C.lua_gc(L.s, C.int(what), C.int(data))) }
-
 // lua_getfield
 func (L *State) GetField(index int, k string) {
 	Ck := C.CString(k)
@@ -330,7 +331,9 @@ func (L *State) IsUserdata(index int) bool { return C.lua_isuserdata(L.s, C.int(
 // Creates a new lua interpreter state with the given allocation function
 func NewStateAlloc(f Alloc) *State {
 	ls := C.clua_newstate(unsafe.Pointer(&f))
-	return newState(ls)
+	L := newState(ls)
+	L.allocfn = &f
+	return L
 }
 
 // lua_newtable
@@ -344,7 +347,7 @@ func (L *State) NewThread() *State {
 	//TODO: should have same lists as parent
 	//		but may complicate gc
 	s := C.lua_newthread(L.s)
-	return &State{s, 0, nil, nil}
+	return &State{s, 0, nil, nil, nil}
 }
 
 // lua_next
@@ -430,7 +433,8 @@ func (L *State) Register(name string, f LuaGoFunction) {
 
 // lua_setallocf
 func (L *State) SetAllocf(f Alloc) {
-	C.clua_setallocf(L.s, unsafe.Pointer(&f))
+	L.allocfn = &f
+	C.clua_setallocf(L.s, unsafe.Pointer(L.allocfn))
 }
 
 // lua_setfield

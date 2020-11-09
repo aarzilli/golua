@@ -225,3 +225,8 @@ func (L *State) RawGeti(index int, n int) {
 func (L *State) RawSeti(index int, n int) {
 	C.lua_rawseti(L.s, C.int(index), C.longlong(n))
 }
+
+// lua_gc
+func (L *State) GC(what, data int) int {
+    return int(C.lua_gc(L.s, C.int(what), C.int(data)))
+}
