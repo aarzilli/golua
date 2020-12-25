@@ -23,9 +23,11 @@ This library is configured using build tags. By default it will look for a libra
 
 If this doesn't work `-tags luadash5.1` can be used to force `lua-5.1`, and `-tags llua` can be used to force `lua`.
 
-If you want to statically link to liblua.a you can do that with `-tags luaaa`. Luajit can also be used by specifying `-tags luajit`.
+If you want to statically link to liblua.a you can do that with `-tags luaa`. Luajit can also be used by
+specifying `-tags luajit`.
 
-The library uses lua5.1 by default but also supports lua5.2 by specifying `-tags lua52`, lua5.3 by specifying `-tags lua53`, and lua5.4 by specifying `-tags lua54`.
+The library uses lua5.1 by default but also supports lua5.2 by specifying `-tags lua52`, lua5.3 by
+specifying `-tags lua53`, and lua5.4 by specifying `-tags lua54`.
 
 QUICK START
 ---------------------
