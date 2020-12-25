@@ -25,6 +25,7 @@ const (
 )
 
 const (
+	LUA_OK            = C.LUA_OK
 	LUA_VERSION       = C.LUA_VERSION
 	LUA_RELEASE       = C.LUA_RELEASE
 	LUA_VERSION_NUM   = C.LUA_VERSION_NUM
