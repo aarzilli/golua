@@ -31,7 +31,10 @@ package lua
 #cgo freebsd,lua53,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua-5.3
 #cgo freebsd,lua54,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua-5.4 -lm
 
-#cgo windows,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -L${SRCDIR} -llua -lmingwex -lmingw32
+#cgo windows,!lua52,!lua53,!lua54,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -L${SRCDIR} -llua -lmingwex -lmingw32
+#cgo windows,lua52,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua52
+#cgo windows,lua53,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua53
+#cgo windows,lua54,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua54
 
 #include <lua.h>
 #include <stdlib.h>
@@ -40,9 +43,10 @@ package lua
 
 */
 import "C"
-import "unsafe"
-
-import "fmt"
+import (
+	"fmt"
+	"unsafe"
+)
 
 type LuaStackEntry struct {
 	Name        string
