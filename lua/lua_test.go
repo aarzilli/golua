@@ -411,3 +411,27 @@ func TestDumpAndLoad(t *testing.T) {
 		t.Fatalf("Call error: %v", err)
 	}
 }
+
+func TestCustomDebugHook(t *testing.T) {
+	L := NewState()
+	defer L.Close()
+
+	L.SetHook(func(l *State) {
+		l.RaiseError("stop")
+	}, 1)
+
+	err := L.DoString(`
+		local x = 0
+		while(1 ~= 0) do
+			x = 2
+		end
+	`)
+
+	if err == nil {
+		t.Fatalf("Script should have raised an error")
+	} else {
+		if err.Error() != "stop" {
+			t.Fatal("Error should be coming from the hook")
+		}
+	}
+}

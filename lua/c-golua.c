@@ -342,11 +342,11 @@ void clua_openbase(lua_State* L)
 void clua_hook_function(lua_State *L, lua_Debug *ar)
 {
 	lua_checkstack(L, 2);
-	lua_pushstring(L, "Lua execution quantum exceeded");
-	lua_error(L);
+	size_t gostateindex = clua_getgostate(L);
+    golua_callgohook(gostateindex);
 }
 
-void clua_setexecutionlimit(lua_State* L, int n)
+void clua_sethook(lua_State* L, int n)
 {
 	lua_sethook(L, &clua_hook_function, LUA_MASKCOUNT, n);
 }

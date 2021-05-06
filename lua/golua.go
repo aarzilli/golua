@@ -24,6 +24,12 @@ type Alloc func(ptr unsafe.Pointer, osize uint, nsize uint) unsafe.Pointer
 // This is the type of go function that can be registered as lua functions
 type LuaGoFunction func(L *State) int
 
+// This is the type of a go function that can be used as a lua_Hook
+type HookFunction func(L *State)
+
+// The errorstring used by State.SetExecutionLimit
+var ExecutionQuantumExceeded = "Lua execution quantum exceeded"
+
 // Wrapper to keep cgo from complaining about incomplete ptr type
 //export State
 type State struct {
@@ -41,6 +47,9 @@ type State struct {
 
 	// User self defined memory alloc func for the lua State
 	allocfn *Alloc
+
+	// User defined hook function
+	hookFn *HookFunction
 }
 
 var goStates map[uintptr]*State
@@ -77,6 +86,15 @@ func golua_callgofunction(gostateindex uintptr, fid uint) int {
 	}
 	f := L1.registry[fid].(LuaGoFunction)
 	return f(L1)
+}
+
+//export golua_callgohook
+func golua_callgohook(gostateindex uintptr) {
+	L1 := getGoState(gostateindex)
+	fp := L1.hookFn
+	if fp != nil {
+		(*fp)(L1)
+	}
 }
 
 var typeOfBytes = reflect.TypeOf([]byte(nil))
