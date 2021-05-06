@@ -28,7 +28,7 @@ type LuaGoFunction func(L *State) int
 type HookFunction func(L *State)
 
 // The errorstring used by State.SetExecutionLimit
-var ExecutionQuantumExceeded = "Lua execution quantum exceeded"
+const ExecutionQuantumExceeded = "Lua execution quantum exceeded"
 
 // Wrapper to keep cgo from complaining about incomplete ptr type
 //export State
