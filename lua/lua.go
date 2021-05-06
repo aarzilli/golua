@@ -581,7 +581,7 @@ func (L *State) OpenOS() {
 // Sets the lua hook (lua_sethook).
 // This and SetExecutionLimit are mutual exclusive
 func (L *State) SetHook(f HookFunction, instrNumber int) {
-	L.hookFn = &f
+	L.hookFn = f
 	C.clua_sethook(L.s, C.int(instrNumber))
 }
 

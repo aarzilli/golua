@@ -49,7 +49,7 @@ type State struct {
 	allocfn *Alloc
 
 	// User defined hook function
-	hookFn *HookFunction
+	hookFn HookFunction
 }
 
 var goStates map[uintptr]*State
@@ -91,9 +91,8 @@ func golua_callgofunction(gostateindex uintptr, fid uint) int {
 //export golua_callgohook
 func golua_callgohook(gostateindex uintptr) {
 	L1 := getGoState(gostateindex)
-	fp := L1.hookFn
-	if fp != nil {
-		(*fp)(L1)
+	if L1.hookFn != nil {
+		L1.hookFn(L1)
 	}
 }
 
