@@ -24,7 +24,7 @@ package lua
 #cgo darwin,!lua52,!lua53,!lua54,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.1
 #cgo darwin,lua52,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.2
 #cgo darwin,lua53,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.3
-#cgo darwin,lua54,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.4 m
+#cgo darwin,lua54,!llua,!luaa,!luajit,!lluadash5.1 pkg-config: lua5.4 -lm
 
 #cgo freebsd,!lua52,!lua53,!lua54,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua-5.1
 #cgo freebsd,lua52,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua-5.2
