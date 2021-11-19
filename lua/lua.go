@@ -13,7 +13,7 @@ package lua
 #cgo llua LDFLAGS: -llua
 
 #cgo luaa LDFLAGS: -llua -lm -ldl
-#cgo luajit LDFLAGS: -lluajit-5.1
+#cgo luajit LDFLAGS: -lluajit
 #cgo lluadash5.1 LDFLAGS: -llua-5.1
 
 #cgo linux,!lua52,!lua53,!lua54,!llua,!luaa,!luajit,!lluadash5.1 LDFLAGS: -llua5.1
