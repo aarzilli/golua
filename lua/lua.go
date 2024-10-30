@@ -438,6 +438,21 @@ func (L *State) Register(name string, f LuaGoFunction) {
 	L.SetGlobal(name)
 }
 
+// Registers a map of go functions as a library that can be accessed using "require("name")"
+func (L *State) RegisterLib(name string, funcs map[string]LuaGoFunction) {
+	L.NewTable()
+	for fname, f := range funcs {
+		L.PushGoFunction(f)
+		L.SetField(-2, fname)
+	}
+
+	L.GetGlobal("package")
+	L.GetField(-1, "loaded")
+	L.PushValue(-3)
+	L.SetField(-2, name)
+	L.Pop(2)
+} 
+
 // lua_setallocf
 func (L *State) SetAllocf(f Alloc) {
 	L.allocfn = &f
