@@ -439,7 +439,7 @@ func (L *State) Register(name string, f LuaGoFunction) {
 }
 
 // Registers a map of go functions as a library that can be accessed using "require("name")"
-func (L *State) RegisterLib(name string, funcs map[string]LuaGoFunction) {
+func (L *State) RegisterLibrary(name string, funcs map[string]LuaGoFunction) {
 	L.GetGlobal(name)
 	found := L.IsTable(-1)
 	if !found {
