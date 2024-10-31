@@ -28,7 +28,7 @@ func main() {
 	defer L.Close()
 	L.OpenLibs()
 	
-	L.RegisterLib("example", funcs)
+	L.RegisterLibrary("example", funcs)
 
 	if err := L.DoString(code); err != nil {
 		panic(err)
