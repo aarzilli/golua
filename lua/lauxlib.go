@@ -6,7 +6,10 @@ package lua
 //#include <stdlib.h>
 //#include "golua.h"
 import "C"
-import "unsafe"
+import (
+	"context"
+	"unsafe"
+)
 
 type LuaError struct {
 	code       int
@@ -190,6 +193,16 @@ func NewState() *State {
 	}
 	L := newState(ls)
 	return L
+}
+
+func NewStateWithContext(ctx context.Context) *State {
+	L := NewState()
+	L.ctx = ctx
+	return L
+}
+
+func (L *State) Context() context.Context {
+	return L.ctx
 }
 
 // luaL_openlibs

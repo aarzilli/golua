@@ -13,6 +13,7 @@ package lua
 import "C"
 
 import (
+	"context"
 	"reflect"
 	"sync"
 	"unsafe"
@@ -50,6 +51,8 @@ type State struct {
 
 	// User defined hook function
 	hookFn HookFunction
+
+	ctx context.Context
 }
 
 var goStates map[uintptr]*State
