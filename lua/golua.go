@@ -52,7 +52,7 @@ type State struct {
 	// User defined hook function
 	hookFn HookFunction
 
-	ctx *context.Context
+	ctx context.Context
 }
 
 var goStates map[uintptr]*State
