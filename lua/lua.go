@@ -59,7 +59,7 @@ type LuaStackEntry struct {
 }
 
 func newState(L *C.lua_State) *State {
-	newstate := &State{L, 0, make([]interface{}, 0, 8), make([]uint, 0, 8), nil, nil}
+	newstate := &State{L, 0, make([]interface{}, 0, 8), make([]uint, 0, 8), nil, nil, nil}
 	registerGoState(newstate)
 	C.clua_setgostate(L, C.size_t(newstate.Index))
 	C.clua_initstate(L)
@@ -354,7 +354,7 @@ func (L *State) NewThread() *State {
 	//TODO: should have same lists as parent
 	//		but may complicate gc
 	s := C.lua_newthread(L.s)
-	return &State{s, 0, nil, nil, nil, nil}
+	return &State{s, 0, nil, nil, nil, nil, nil}
 }
 
 // lua_next
