@@ -197,12 +197,12 @@ func NewState() *State {
 
 func NewStateWithContext(ctx context.Context) *State {
 	L := NewState()
-	L.ctx = ctx
+	L.ctx = &ctx
 	return L
 }
 
 func (L *State) Context() context.Context {
-	return L.ctx
+	return *L.ctx
 }
 
 // luaL_openlibs
