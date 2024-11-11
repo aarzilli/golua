@@ -353,8 +353,13 @@ func (L *State) NewThread() *State {
 	//TODO: call newState with result from C.lua_newthread and return it
 	//TODO: should have same lists as parent
 	//		but may complicate gc
-	s := C.lua_newthread(L.s)
-	return &State{s, 0, nil, nil, nil, nil, nil}
+	L2 := newState(C.lua_newthread(L.s))
+	L2.freeIndices = make([]uint, len(L.freeIndices))
+	copy(L2.freeIndices, L.freeIndices)
+	L2.allocfn = L.allocfn
+	L2.hookFn = L.hookFn
+	L2.ctx = L.ctx
+	return L2
 }
 
 // lua_next
