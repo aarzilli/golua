@@ -37,14 +37,16 @@ type State struct {
 	// Wrapped lua_State object
 	s *C.lua_State
 
+	mutex *sync.Mutex
+
 	// index of this object inside the goStates array
 	Index uintptr
 
 	// Registry of go object that have been pushed to Lua VM
-	registry []interface{}
+	registry *[]interface{}
 
 	// Freelist for funcs indices, to allow for freeing
-	freeIndices []uint
+	freeIndices *[]uint
 
 	// User self defined memory alloc func for the lua State
 	allocfn *Alloc
@@ -84,10 +86,13 @@ func getGoState(gostateindex uintptr) *State {
 //export golua_callgofunction
 func golua_callgofunction(gostateindex uintptr, fid uint) int {
 	L1 := getGoState(gostateindex)
+	L1.mutex.Lock()
+	defer L1.mutex.Unlock()
+
 	if fid < 0 {
 		panic(&LuaError{0, "Requested execution of an unknown function", L1.StackTrace()})
 	}
-	f := L1.registry[fid].(LuaGoFunction)
+	f := (*L1.registry)[fid].(LuaGoFunction)
 	return f(L1)
 }
 
@@ -104,11 +109,13 @@ var typeOfBytes = reflect.TypeOf([]byte(nil))
 //export golua_interface_newindex_callback
 func golua_interface_newindex_callback(gostateindex uintptr, iid uint, field_name_cstr *C.char) int {
 	L := getGoState(gostateindex)
-	iface := L.registry[iid]
+
+	L.mutex.Lock()
+	iface := (*L.registry)[iid]
+	L.mutex.Unlock()
+
 	ifacevalue := reflect.ValueOf(iface).Elem()
-
 	field_name := C.GoString(field_name_cstr)
-
 	fval := ifacevalue.FieldByName(field_name)
 
 	if fval.Kind() == reflect.Ptr {
@@ -199,9 +206,12 @@ func golua_interface_newindex_callback(gostateindex uintptr, iid uint, field_nam
 //export golua_interface_index_callback
 func golua_interface_index_callback(gostateindex uintptr, iid uint, field_name *C.char) int {
 	L := getGoState(gostateindex)
-	iface := L.registry[iid]
-	ifacevalue := reflect.ValueOf(iface).Elem()
+	
+	L.mutex.Lock()
+	iface := (*L.registry)[iid]
+	L.mutex.Unlock()
 
+	ifacevalue := reflect.ValueOf(iface).Elem()
 	fval := ifacevalue.FieldByName(C.GoString(field_name))
 
 	if fval.Kind() == reflect.Ptr {
@@ -267,7 +277,9 @@ func golua_gchook(gostateindex uintptr, id uint) int {
 //export golua_callpanicfunction
 func golua_callpanicfunction(gostateindex uintptr, id uint) int {
 	L1 := getGoState(gostateindex)
-	f := L1.registry[id].(LuaGoFunction)
+	L1.mutex.Lock()
+	f := (*L1.registry)[id].(LuaGoFunction)
+	L1.mutex.Unlock()
 	return f(L1)
 }
 
