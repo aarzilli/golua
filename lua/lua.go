@@ -60,9 +60,8 @@ type LuaStackEntry struct {
 }
 
 func newState(L *C.lua_State) *State {
-	registry := make([]interface{}, 0, 8)
-	freeIndices := make([]uint, 0, 8)
-	newstate := &State{L, &sync.Mutex{}, 0, &registry, &freeIndices, nil, nil, nil}
+	registry := &goRegistry{sync.Mutex{}, make([]interface{}, 0, 8), make([]uint, 0, 8)}
+	newstate := &State{L, 0, registry, nil, nil, nil}
 	registerGoState(newstate)
 	C.clua_setgostate(L, C.size_t(newstate.Index))
 	C.clua_initstate(L)
@@ -70,27 +69,25 @@ func newState(L *C.lua_State) *State {
 }
 
 func (L *State) addFreeIndex(i uint) {
-	freelen := len(*L.freeIndices)
+	freelen := len(L.registry.freeIndices)
 	//reallocate if necessary
-	if freelen+1 > cap(*L.freeIndices) {
-		newSlice := make([]uint, freelen, cap(*L.freeIndices)*2)
-		copy(newSlice, *L.freeIndices)
-		L.freeIndices = &newSlice
+	if freelen+1 > cap(L.registry.freeIndices) {
+		newSlice := make([]uint, freelen, cap(L.registry.freeIndices)*2)
+		copy(newSlice, L.registry.freeIndices)
+		L.registry.freeIndices = newSlice
 	}
 	//reslice
-	newSlice := (*L.freeIndices)[0 : freelen+1]
-	L.freeIndices = &newSlice
-	(*L.freeIndices)[freelen] = i
+	L.registry.freeIndices = L.registry.freeIndices[0 : freelen+1]
+	L.registry.freeIndices[freelen] = i
 }
 
 func (L *State) getFreeIndex() (index uint, ok bool) {
-	freelen := len(*L.freeIndices)
+	freelen := len(L.registry.freeIndices)
 	//if there exist entries in the freelist
 	if freelen > 0 {
-		i := (*L.freeIndices)[freelen-1] //get index
+		i := L.registry.freeIndices[freelen-1] //get index
 		//fmt.Printf("Free indices before: %v\n", L.freeIndices)
-		newSlice := (*L.freeIndices)[0 : freelen-1] //'pop' index from list
-		L.freeIndices = &newSlice
+		L.registry.freeIndices = L.registry.freeIndices[0 : freelen-1] //'pop' index from list
 		//fmt.Printf("Free indices after: %v\n", L.freeIndices)
 		return i, true
 	}
@@ -99,41 +96,40 @@ func (L *State) getFreeIndex() (index uint, ok bool) {
 
 //returns the registered function id
 func (L *State) register(f interface{}) uint {
-	L.mutex.Lock()
-	defer L.mutex.Unlock()
+	L.registry.mu.Lock()
+	defer L.registry.mu.Unlock()
 
 	//fmt.Printf("Registering %v\n")
 	index, ok := L.getFreeIndex()
 	//fmt.Printf("\tfreeindex: index = %v, ok = %v\n", index, ok)
 	//if not ok, then we need to add new index by extending the slice
 	if !ok {
-		index = uint(len(*L.registry))
+		index = uint(len(L.registry.items))
 		//reallocate backing array if necessary
-		if index+1 > uint(cap(*L.registry)) {
-			newcap := cap(*L.registry) * 2
+		if index+1 > uint(cap(L.registry.items)) {
+			newcap := cap(L.registry.items) * 2
 			if index+1 > uint(newcap) {
 				newcap = int(index + 1)
 			}
 			newSlice := make([]interface{}, index, newcap)
-			copy(newSlice, *L.registry)
-			L.registry = &newSlice
+			copy(newSlice, L.registry.items)
+			L.registry.items = newSlice
 		}
 		//reslice
-		newSlice := (*L.registry)[0 : index+1]
-		L.registry = &newSlice
+		L.registry.items = L.registry.items[0 : index+1]
 	}
 	//fmt.Printf("\tregistering %d %v\n", index, f)
-	(*L.registry)[index] = f
+	L.registry.items[index] = f
 	return index
 }
 
 func (L *State) unregister(fid uint) {
-	L.mutex.Lock()
-	defer L.mutex.Unlock()
+	L.registry.mu.Lock()
+	defer L.registry.mu.Unlock()
 
 	//fmt.Printf("Unregistering %d (len: %d, value: %v)\n", fid, len(L.registry), L.registry[fid])
-	if (fid < uint(len(*L.registry))) && ((*L.registry)[fid] != nil) {
-		(*L.registry)[fid] = nil
+	if fid < uint(len(L.registry.items)) && L.registry.items[fid] != nil {
+		L.registry.items[fid] = nil
 		L.addFreeIndex(fid)
 	}
 }
@@ -204,9 +200,9 @@ func (L *State) AtPanic(panicf LuaGoFunction) (oldpanicf LuaGoFunction) {
 	oldres := interface{}(C.clua_atpanic(L.s, C.uint(fid)))
 	switch i := oldres.(type) {
 	case C.uint:
-		L.mutex.Lock()
-		f := (*L.registry)[uint(i)].(LuaGoFunction)
-		L.mutex.Unlock()
+		L.registry.mu.Lock()
+		f := L.registry.items[uint(i)].(LuaGoFunction)
+		L.registry.mu.Unlock()
 		//free registry entry
 		L.unregister(uint(i))
 		return f
@@ -364,16 +360,14 @@ func (L *State) NewTable() {
 
 // lua_newthread
 func (L *State) NewThread() *State {
-	L.mutex.Lock()
-	defer L.mutex.Unlock()
+	L.registry.mu.Lock()
+	defer L.registry.mu.Unlock()
 
 	//TODO: call newState with result from C.lua_newthread and return it
 	//TODO: should have same lists as parent
 	//		but may complicate gc
 	L2 := newState(C.lua_newthread(L.s))
-	L2.mutex = L.mutex
 	L2.registry = L.registry
-	L2.freeIndices = L.freeIndices
 	L2.allocfn = L.allocfn
 	L2.hookFn = L.hookFn
 	L2.ctx = L.ctx
@@ -532,9 +526,9 @@ func (L *State) ToGoFunction(index int) (f LuaGoFunction) {
 		return nil
 	}
 
-	L.mutex.Lock()
-	function := (*L.registry)[fid].(LuaGoFunction)
-	L.mutex.Unlock()
+	L.registry.mu.Lock()
+	function := L.registry.items[fid].(LuaGoFunction)
+	L.registry.mu.Unlock()
 	return function
 }
 
@@ -548,9 +542,9 @@ func (L *State) ToGoStruct(index int) (f interface{}) {
 		return nil
 	}
 
-	L.mutex.Lock()
-	idx := (*L.registry)[fid]
-	L.mutex.Unlock()
+	L.registry.mu.Lock()
+	idx := L.registry.items[fid]
+	L.registry.mu.Unlock()
 	return idx
 }
 
