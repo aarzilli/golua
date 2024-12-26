@@ -15,6 +15,7 @@ import (
 
 var (
 	flagDoWrite    = flag.Bool("write", false, "Write to the opened file")
+	flagClean      = flag.Bool("clean", false, "Removes the added documentation (use with -write)")
 	flagLuaVersion = flag.String("luaversion", "5.1", "Lua documentation version")
 	// flagHelp       = flag.Bool("help", false, "Show help")
 	// flagHelpShort  = flag.Bool("h", false, "Show help")
@@ -27,7 +28,7 @@ func main() {
 	// 	return
 	// }
 	if len(os.Args) < 2 {
-		fmt.Printf("Usage: %s [-write] [-luaversion <version | 5.1>] <go-file> ", os.Args[0])
+		fmt.Printf("Usage: %s [-write] [-clean] [-luaversion <version | 5.1>] <go-file> ", os.Args[0])
 		os.Exit(1)
 	}
 
@@ -40,31 +41,37 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Fetch or load cached Lua documentation
-	luadocs, err := getCachedLuaDocs()
-	if err != nil {
-		fmt.Println("Error fetching Lua documentation:", err)
-		os.Exit(1)
-	}
+	updatedCode := ""
+	if *flagClean {
+		updatedCode = removeOldDocumentation(string(goCode))
+	} else {
 
-	luaFuncs, err := parseLuaDocs(luadocs)
-	if err != nil {
-		fmt.Println("Error parsing Lua documentation:", err)
-		os.Exit(1)
-	}
+		// Fetch or load cached Lua documentation
+		luadocs, err := getCachedLuaDocs()
+		if err != nil {
+			fmt.Println("Error fetching Lua documentation:", err)
+			os.Exit(1)
+		}
 
-	// Add comments to the Go code
-	annotatedCode := addDocumentation(string(goCode), luaFuncs)
+		luaFuncs, err := parseLuaDocs(luadocs)
+		if err != nil {
+			fmt.Println("Error parsing Lua documentation:", err)
+			os.Exit(1)
+		}
+
+		// Add comments to the Go code
+		updatedCode = addDocumentation(string(goCode), luaFuncs)
+	}
 
 	if *flagDoWrite {
-		err := os.WriteFile(goFile, []byte(annotatedCode), 0644)
+		err := os.WriteFile(goFile, []byte(updatedCode), 0644)
 		if err != nil {
 			fmt.Println("Error writing annotated code to file:", err)
 			os.Exit(1)
 		}
 		fmt.Println("Annotated code written back to", goFile)
 	} else {
-		fmt.Println(annotatedCode)
+		fmt.Println(updatedCode)
 	}
 }
 
