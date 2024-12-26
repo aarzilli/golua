@@ -435,3 +435,75 @@ func TestCustomDebugHook(t *testing.T) {
 		}
 	}
 }
+
+func TestSetUpValueShouldErrorOnInvalidCall(t *testing.T) {
+	L := NewState()
+	defer L.Close()
+
+	L.PushGoFunction(func(L *State) int { return 0 })
+	L.PushString("Hello")
+	if L.SetUpvalue(-2, 1) == true { // Should not be succesful
+		t.Fatal("SetUpvalue should return false because an upvalue can't be set on userdata")
+	}
+	if L.GetTop() != 2 {
+		t.Fatal("Expected SetUpvalue to pop nothing on error")
+	}
+}
+
+// This test is more an example to show why we can't directly set Upvalue on PushGoClosure, but rather
+// have to rely on PushGoClosureWithUpvalues
+func TestSetUpvalueOnGoClosureShouldErrorAt2(t *testing.T) {
+	L := NewState()
+	defer L.Close()
+
+	L.PushGoClosure(func(L *State) int { return 0 })
+	L.PushString("Hello")
+	// Should be succesful because the function returned by PushGoClosure actually has an upvalue
+	// at 1, which is the GoFunction userdata, that the closure calls.
+	if !L.SetUpvalue(-2, 1) {
+		t.Fatal("SetUpvalue should return false because an upvalue can't be set on userdata")
+	}
+	// Only the GoClosure should be left on the stack, since SetUpvalue was succesful
+	if L.GetTop() != 1 {
+		t.Fatalf("Expected GetTop to return 1 as SetUpvalue should pop value on success, but top is at: %d\n", L.GetTop())
+	}
+
+	L.PushString("Hello")
+	// Since this closure only has 1 upvalue. It shouldn't be possible to add a second after the fact
+	if L.SetUpvalue(-2, 2) {
+		t.Fatal("SetUpvalue should return false because setting an upvalue at a higher index after creation is not possible")
+	}
+	// Since SetUpvalue failed, the string should remain
+	if L.GetTop() != 2 {
+		t.Fatal("Expected SetUpvalue to pop nothing on error")
+	}
+}
+
+func TestPushGoClosureWithUpvalues(t *testing.T) {
+	L := NewState()
+	defer L.Close()
+
+	closure := func(L *State) int {
+		if !L.IsString(L.UpvalueIndex(2)) {
+			t.Fatalf("upvalue 2 not set correctly, expected it to be a string")
+		}
+		if !L.IsNumber(L.UpvalueIndex(3)) {
+			t.Fatalf("upvalue 3 not set correctly, expected it to be an number")
+		}
+		if L.ToString(L.UpvalueIndex(2)) != "Hello" {
+			t.Fatalf("upvalue 2 not set correctly, expected it to equal \"Hello\"")
+		}
+		if L.ToInteger(L.UpvalueIndex(3)) != 15 {
+			t.Fatalf("upvalue 3 not set correctly, expected it to equal 15")
+		}
+		return 0
+	}
+
+	L.PushString("Hello")
+	L.PushInteger(15)
+	L.PushGoClosureWithUpvalues(closure, 2)
+	err := L.Call(0, 0)
+	if err != nil {
+		t.Fatalf("Call to function returned by PushGoClosureWithUpvalues should not fail: %s\n", err.Error())
+	}
+}

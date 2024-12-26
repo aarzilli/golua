@@ -117,9 +117,9 @@ static int callback_c (lua_State* L)
 	return golua_callgofunction(gostateindex,fid);
 }
 
-void clua_pushcallback(lua_State* L)
+void clua_pushcallback(lua_State* L, unsigned int nup)
 {
-	lua_pushcclosure(L,callback_c,1);
+	lua_pushcclosure(L,callback_c, 1 + nup);
 }
 
 void clua_pushgostruct(lua_State* L, unsigned int iid)
