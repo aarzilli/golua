@@ -6,6 +6,7 @@ package lua
 //#include <stdlib.h>
 //#include "golua.h"
 import "C"
+
 import (
 	"context"
 	"unsafe"
@@ -78,7 +79,7 @@ func (L *State) CheckString(narg int) string {
 //
 // BUG(everyone_involved): not implemented
 func (L *State) CheckOption(narg int, def string, lst []string) int {
-	//TODO: complication: lst conversion to const char* lst[] from string slice
+	// TODO: complication: lst conversion to const char* lst[] from string slice
 	return 0
 }
 

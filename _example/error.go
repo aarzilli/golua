@@ -1,9 +1,11 @@
 package main
 
-import "github.com/aarzilli/golua/lua"
-import "fmt"
-import "errors"
-import "os"
+import (
+	"github.com/aarzilli/golua/lua"
+	"fmt"
+	"errors"
+	"os"
+)
 
 func testDefault(L *lua.State) {
 	err := L.DoString("print(\"Unknown variable\" .. x)")

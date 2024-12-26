@@ -1,4 +1,5 @@
-//+build !lua52,!lua53,!lua54
+//go:build !lua52 && !lua53 && !lua54
+// +build !lua52,!lua53,!lua54
 
 package lua
 

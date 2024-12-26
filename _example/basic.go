@@ -1,7 +1,9 @@
 package main
 
-import "github.com/aarzilli/golua/lua"
-import "fmt"
+import (
+	"github.com/aarzilli/golua/lua"
+	"fmt"
+)
 
 func test(L *lua.State) int {
 	fmt.Println("hello world! from go!")

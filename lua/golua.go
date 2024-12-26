@@ -32,6 +32,7 @@ type HookFunction func(L *State)
 const ExecutionQuantumExceeded = "Lua execution quantum exceeded"
 
 // Wrapper to keep cgo from complaining about incomplete ptr type
+//
 //export State
 type State struct {
 	// Wrapped lua_State object
@@ -55,8 +56,10 @@ type State struct {
 	ctx context.Context
 }
 
-var goStates map[uintptr]*State
-var goStatesMutex sync.Mutex
+var (
+	goStates      map[uintptr]*State
+	goStatesMutex sync.Mutex
+)
 
 func init() {
 	goStates = make(map[uintptr]*State, 16)

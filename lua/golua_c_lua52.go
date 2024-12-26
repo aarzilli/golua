@@ -1,4 +1,5 @@
-//+build lua52
+//go:build lua52
+// +build lua52
 
 package lua
 

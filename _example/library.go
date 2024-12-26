@@ -13,7 +13,7 @@ func test2(L *lua.State) int {
 }
 
 var funcs = map[string]lua.LuaGoFunction{
-	"test": test,
+	"test":  test,
 	"test2": test2,
 }
 
@@ -27,7 +27,7 @@ func main() {
 	L := lua.NewState()
 	defer L.Close()
 	L.OpenLibs()
-	
+
 	L.RegisterLibrary("example", funcs)
 
 	if err := L.DoString(code); err != nil {

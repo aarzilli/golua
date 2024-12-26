@@ -130,7 +130,6 @@ func TestCall(t *testing.T) {
 	L.PushString("Argument2")
 	L.PushString("Argument3")
 	err := L.Call(3, 2)
-
 	if err != nil {
 		t.Fatalf("Error executing call: %v\n", err)
 	}

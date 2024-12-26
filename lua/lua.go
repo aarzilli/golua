@@ -46,6 +46,7 @@ package lua
 
 */
 import "C"
+
 import (
 	"fmt"
 	"unsafe"
@@ -68,39 +69,39 @@ func newState(L *C.lua_State) *State {
 
 func (L *State) addFreeIndex(i uint) {
 	freelen := len(L.freeIndices)
-	//reallocate if necessary
+	// reallocate if necessary
 	if freelen+1 > cap(L.freeIndices) {
 		newSlice := make([]uint, freelen, cap(L.freeIndices)*2)
 		copy(newSlice, L.freeIndices)
 		L.freeIndices = newSlice
 	}
-	//reslice
+	// reslice
 	L.freeIndices = L.freeIndices[0 : freelen+1]
 	L.freeIndices[freelen] = i
 }
 
 func (L *State) getFreeIndex() (index uint, ok bool) {
 	freelen := len(L.freeIndices)
-	//if there exist entries in the freelist
+	// if there exist entries in the freelist
 	if freelen > 0 {
-		i := L.freeIndices[freelen-1] //get index
-		//fmt.Printf("Free indices before: %v\n", L.freeIndices)
+		i := L.freeIndices[freelen-1] // get index
+		// fmt.Printf("Free indices before: %v\n", L.freeIndices)
 		L.freeIndices = L.freeIndices[0 : freelen-1] //'pop' index from list
-		//fmt.Printf("Free indices after: %v\n", L.freeIndices)
+		// fmt.Printf("Free indices after: %v\n", L.freeIndices)
 		return i, true
 	}
 	return 0, false
 }
 
-//returns the registered function id
+// returns the registered function id
 func (L *State) register(f interface{}) uint {
-	//fmt.Printf("Registering %v\n")
+	// fmt.Printf("Registering %v\n")
 	index, ok := L.getFreeIndex()
-	//fmt.Printf("\tfreeindex: index = %v, ok = %v\n", index, ok)
-	//if not ok, then we need to add new index by extending the slice
+	// fmt.Printf("\tfreeindex: index = %v, ok = %v\n", index, ok)
+	// if not ok, then we need to add new index by extending the slice
 	if !ok {
 		index = uint(len(L.registry))
-		//reallocate backing array if necessary
+		// reallocate backing array if necessary
 		if index+1 > uint(cap(L.registry)) {
 			newcap := cap(L.registry) * 2
 			if index+1 > uint(newcap) {
@@ -110,16 +111,16 @@ func (L *State) register(f interface{}) uint {
 			copy(newSlice, L.registry)
 			L.registry = newSlice
 		}
-		//reslice
+		// reslice
 		L.registry = L.registry[0 : index+1]
 	}
-	//fmt.Printf("\tregistering %d %v\n", index, f)
+	// fmt.Printf("\tregistering %d %v\n", index, f)
 	L.registry[index] = f
 	return index
 }
 
 func (L *State) unregister(fid uint) {
-	//fmt.Printf("Unregistering %d (len: %d, value: %v)\n", fid, len(L.registry), L.registry[fid])
+	// fmt.Printf("Unregistering %d (len: %d, value: %v)\n", fid, len(L.registry), L.registry[fid])
 	if (fid < uint(len(L.registry))) && (L.registry[fid] != nil) {
 		L.registry[fid] = nil
 		L.addFreeIndex(fid)
@@ -144,14 +145,14 @@ func (L *State) PushGoClosure(f LuaGoFunction) {
 //
 // The code:
 //
-// 	L.LGetMetaTable(tableName)
-// 	L.SetMetaMethod(methodName, function)
+//	L.LGetMetaTable(tableName)
+//	L.SetMetaMethod(methodName, function)
 //
 // is the logical equivalent of:
 //
-// 	L.LGetMetaTable(tableName)
-// 	L.PushGoFunction(function)
-// 	L.SetField(-2, methodName)
+//	L.LGetMetaTable(tableName)
+//	L.PushGoFunction(function)
+//	L.SetField(-2, methodName)
 //
 // except this wouldn't work because pushing a go function results in user data not a cfunction
 func (L *State) SetMetaMethod(methodName string, f LuaGoFunction) {
@@ -172,7 +173,7 @@ func (L *State) PushGoStruct(iface interface{}) {
 //
 // This function doesn't save a reference to the interface, it is the responsibility of the caller of this function to insure that the interface outlasts the lifetime of the lua object that this function creates.
 func (L *State) PushLightUserdata(ud *interface{}) {
-	//push
+	// push
 	C.lua_pushlightuserdata(L.s, unsafe.Pointer(ud))
 }
 
@@ -193,7 +194,7 @@ func (L *State) AtPanic(panicf LuaGoFunction) (oldpanicf LuaGoFunction) {
 	switch i := oldres.(type) {
 	case C.uint:
 		f := L.registry[uint(i)].(LuaGoFunction)
-		//free registry entry
+		// free registry entry
 		L.unregister(uint(i))
 		return f
 	case C.lua_CFunction:
@@ -201,8 +202,8 @@ func (L *State) AtPanic(panicf LuaGoFunction) (oldpanicf LuaGoFunction) {
 			return int(C.clua_callluacfunc(L1.s, i))
 		}
 	}
-	//generally we only get here if the panicf got set to something like nil
-	//potentially dangerous because we may silently fail
+	// generally we only get here if the panicf got set to something like nil
+	// potentially dangerous because we may silently fail
 	return nil
 }
 
@@ -350,8 +351,8 @@ func (L *State) NewTable() {
 
 // lua_newthread
 func (L *State) NewThread() *State {
-	//TODO: call newState with result from C.lua_newthread and return it
-	//TODO: should have same lists as parent
+	// TODO: call newState with result from C.lua_newthread and return it
+	// TODO: should have same lists as parent
 	//		but may complicate gc
 	s := C.lua_newthread(L.s)
 	return &State{s, 0, nil, nil, nil, nil, nil}
@@ -365,8 +366,8 @@ func (L *State) Next(index int) int {
 // lua_objlen
 // lua_pop
 func (L *State) Pop(n int) {
-	//Why is this implemented this way? I don't get it...
-	//C.lua_pop(L.s, C.int(n));
+	// Why is this implemented this way? I don't get it...
+	// C.lua_pop(L.s, C.int(n));
 	C.lua_settop(L.s, C.int(-n-1))
 }
 
@@ -543,7 +544,7 @@ func (L *State) ToPointer(index int) uintptr {
 
 // lua_tothread
 func (L *State) ToThread(index int) *State {
-	//TODO: find a way to link lua_State* to existing *State, return that
+	// TODO: find a way to link lua_State* to existing *State, return that
 	return &State{}
 }
 
