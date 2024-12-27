@@ -145,6 +145,7 @@ CONTRIBUTORS
 * Pierre Neidhardt (@Ambrevar)
 * HuangWei (@huangwei1024)
 * Adam Saponara
+* [Tim van Osch](https://github.com/TimVosch)
 
 SEE ALSO
 ---------------------
