@@ -149,29 +149,29 @@ func (L *State) ObjLen(index int) uint {
 	return uint(C.lua_rawlen(L.s, C.int(index)))
 }
 
-// lua_tointeger
-/*
- * [-0, +0, –]
- * Equivalent to lua_tointegerx with isnum equal to NULL.
- */
+// [lua_tointeger] -> [-0, +0, –]
+//
+// Equivalent to lua_tointegerx with isnum equal to NULL.
+//
+// [lua_tointeger]: https://www.lua.org/manual/5.2/manual.html#lua_tointeger
 func (L *State) ToInteger(index int) int {
 	return int(C.lua_tointegerx(L.s, C.int(index), nil))
 }
 
-// lua_tonumber
-/*
- * [-0, +0, –]
- * Equivalent to lua_tonumberx with isnum equal to NULL.
- */
+// [lua_tonumber] -> [-0, +0, –]
+//
+// Equivalent to lua_tonumberx with isnum equal to NULL.
+//
+// [lua_tonumber]: https://www.lua.org/manual/5.2/manual.html#lua_tonumber
 func (L *State) ToNumber(index int) float64 {
 	return float64(C.lua_tonumberx(L.s, C.int(index), nil))
 }
 
-// lua_yield
-/*
- * [-?, +?, –]
- * This function is equivalent to lua_yieldk, but it has no continuation (see §4.7). Therefore, when the thread resumes, it returns to the function that called the function calling lua_yield.
- */
+// [lua_yield] -> [-?, +?, –]
+//
+// This function is equivalent to lua_yieldk, but it has no continuation (see §4.7). Therefore, when the thread resumes, it returns to the function that called the function calling lua_yield.
+//
+// [lua_yield]: https://www.lua.org/manual/5.2/manual.html#lua_yield
 func (L *State) Yield(nresults int) int {
 	return int(C.lua_yieldk(L.s, C.int(nresults), 0, nil))
 }
@@ -187,20 +187,20 @@ func (L *State) GetGlobal(name string) {
 	C.lua_getglobal(L.s, Ck)
 }
 
-// lua_resume
-/*
- * [-?, +?, –]
- * Starts and resumes a coroutine in a given thread.
- */
+// [lua_resume] -> [-?, +?, –]
+//
+// Starts and resumes a coroutine in a given thread.
+//
+// [lua_resume]: https://www.lua.org/manual/5.2/manual.html#lua_resume
 func (L *State) Resume(narg int) int {
 	return int(C.lua_resume(L.s, nil, C.int(narg)))
 }
 
-// lua_setglobal
-/*
- * [-1, +0, e]
- * Pops a value from the stack and sets it as the new value of global name.
- */
+// [lua_setglobal] -> [-1, +0, e]
+//
+// Pops a value from the stack and sets it as the new value of global name.
+//
+// [lua_setglobal]: https://www.lua.org/manual/5.2/manual.html#lua_setglobal
 func (L *State) SetGlobal(name string) {
 	Cname := C.CString(name)
 	defer C.free(unsafe.Pointer(Cname))
@@ -222,54 +222,54 @@ func (L *State) OpenCoroutine() {
 	C.clua_opencoroutine(L.s)
 }
 
-// lua_insert
-/*
- * [-1, +1, –]
- * Moves the top element into the given valid index, shifting up the elements above this index to open space. This function cannot be called with a pseudo-index, because a pseudo-index is not an actual stack position.
- */
+// [lua_insert] -> [-1, +1, –]
+//
+// Moves the top element into the given valid index, shifting up the elements above this index to open space. This function cannot be called with a pseudo-index, because a pseudo-index is not an actual stack position.
+//
+// [lua_insert]: https://www.lua.org/manual/5.2/manual.html#lua_insert
 func (L *State) Insert(index int) { C.lua_insert(L.s, C.int(index)) }
 
-// lua_remove
-/*
- * [-1, +0, –]
- * Removes the element at the given valid index, shifting down the elements above this index to fill the gap. This function cannot be called with a pseudo-index, because a pseudo-index is not an actual stack position.
- */
+// [lua_remove] -> [-1, +0, –]
+//
+// Removes the element at the given valid index, shifting down the elements above this index to fill the gap. This function cannot be called with a pseudo-index, because a pseudo-index is not an actual stack position.
+//
+// [lua_remove]: https://www.lua.org/manual/5.2/manual.html#lua_remove
 func (L *State) Remove(index int) {
 	C.lua_remove(L.s, C.int(index))
 }
 
-// lua_replace
-/*
- * [-1, +0, –]
- * Moves the top element into the given valid index without shifting any element (therefore replacing the value at the given index), and then pops the top element.
- */
+// [lua_replace] -> [-1, +0, –]
+//
+// Moves the top element into the given valid index without shifting any element (therefore replacing the value at the given index), and then pops the top element.
+//
+// [lua_replace]: https://www.lua.org/manual/5.2/manual.html#lua_replace
 func (L *State) Replace(index int) {
 	C.lua_replace(L.s, C.int(index))
 }
 
-// lua_rawgeti
-/*
- * [-0, +1, –]
- * Pushes onto the stack the value t[n], where t is the table at the given index. The access is raw; that is, it does not invoke metamethods.
- */
+// [lua_rawgeti] -> [-0, +1, –]
+//
+// Pushes onto the stack the value t[n], where t is the table at the given index. The access is raw; that is, it does not invoke metamethods.
+//
+// [lua_rawgeti]: https://www.lua.org/manual/5.2/manual.html#lua_rawgeti
 func (L *State) RawGeti(index int, n int) {
 	C.lua_rawgeti(L.s, C.int(index), C.int(n))
 }
 
-// lua_rawseti
-/*
- * [-1, +0, e]
- * Does the equivalent of t[n] = v, where t is the table at the given index and v is the value at the top of the stack.
- */
+// [lua_rawseti] -> [-1, +0, e]
+//
+// Does the equivalent of t[n] = v, where t is the table at the given index and v is the value at the top of the stack.
+//
+// [lua_rawseti]: https://www.lua.org/manual/5.2/manual.html#lua_rawseti
 func (L *State) RawSeti(index int, n int) {
 	C.lua_rawseti(L.s, C.int(index), C.int(n))
 }
 
-// lua_gc
-/*
- * [-0, +0, e]
- * Controls the garbage collector.
- */
+// [lua_gc] -> [-0, +0, e]
+//
+// Controls the garbage collector.
+//
+// [lua_gc]: https://www.lua.org/manual/5.2/manual.html#lua_gc
 func (L *State) GC(what, data int) int {
 	return int(C.lua_gc(L.s, C.int(what), C.int(data)))
 }

@@ -123,38 +123,38 @@ func lualLoadFile(s *C.lua_State, filename *C.char) C.int {
 	return C.luaL_loadfile(s, filename)
 }
 
-// lua_equal
-/*
- * [-0, +0, e]
- * Returns 1 if the two values in acceptable indices index1 and index2 are equal, following the semantics of the Lua == operator (that is, may call metamethods). Otherwise returns 0. Also returns 0 if any of the indices is non valid.
- */
+// [lua_equal] -> [-0, +0, e]
+//
+// Returns 1 if the two values in acceptable indices index1 and index2 are equal, following the semantics of the Lua == operator (that is, may call metamethods). Otherwise returns 0. Also returns 0 if any of the indices is non valid.
+//
+// [lua_equal]: https://www.lua.org/manual/5.1/manual.html#lua_equal
 func (L *State) Equal(index1, index2 int) bool {
 	return C.lua_equal(L.s, C.int(index1), C.int(index2)) == 1
 }
 
-// lua_getfenv
-/*
- * [-0, +1, -]
- * Pushes onto the stack the environment table of the value at the given index.
- */
+// [lua_getfenv] -> [-0, +1, -]
+//
+// Pushes onto the stack the environment table of the value at the given index.
+//
+// [lua_getfenv]: https://www.lua.org/manual/5.1/manual.html#lua_getfenv
 func (L *State) GetfEnv(index int) {
 	C.lua_getfenv(L.s, C.int(index))
 }
 
-// lua_lessthan
-/*
- * [-0, +0, e]
- * Returns 1 if the value at acceptable index index1 is smaller than the value at acceptable index index2, following the semantics of the Lua < operator (that is, may call metamethods). Otherwise returns 0. Also returns 0 if any of the indices is non valid.
- */
+// [lua_lessthan] -> [-0, +0, e]
+//
+// Returns 1 if the value at acceptable index index1 is smaller than the value at acceptable index index2, following the semantics of the Lua < operator (that is, may call metamethods). Otherwise returns 0. Also returns 0 if any of the indices is non valid.
+//
+// [lua_lessthan]: https://www.lua.org/manual/5.1/manual.html#lua_lessthan
 func (L *State) LessThan(index1, index2 int) bool {
 	return C.lua_lessthan(L.s, C.int(index1), C.int(index2)) == 1
 }
 
-// lua_setfenv
-/*
- * [-1, +0, -]
- * Pops a table from the stack and sets it as the new environment for the value at the given index. If the value at the given index is neither a function nor a thread nor a userdata, lua_setfenv returns 0. Otherwise it returns 1.
- */
+// [lua_setfenv] -> [-1, +0, -]
+//
+// Pops a table from the stack and sets it as the new environment for the value at the given index. If the value at the given index is neither a function nor a thread nor a userdata, lua_setfenv returns 0. Otherwise it returns 1.
+//
+// [lua_setfenv]: https://www.lua.org/manual/5.1/manual.html#lua_setfenv
 func (L *State) SetfEnv(index int) {
 	C.lua_setfenv(L.s, C.int(index))
 }
@@ -163,29 +163,29 @@ func (L *State) ObjLen(index int) uint {
 	return uint(C.lua_objlen(L.s, C.int(index)))
 }
 
-// lua_tointeger
-/*
- * [-0, +0, -]
- * Converts the Lua value at the given acceptable index to the signed integral type lua_Integer. The Lua value must be a number or a string convertible to a number (see §2.2.1); otherwise, lua_tointeger returns 0.
- */
+// [lua_tointeger] -> [-0, +0, -]
+//
+// Converts the Lua value at the given acceptable index to the signed integral type lua_Integer. The Lua value must be a number or a string convertible to a number (see §2.2.1); otherwise, lua_tointeger returns 0.
+//
+// [lua_tointeger]: https://www.lua.org/manual/5.1/manual.html#lua_tointeger
 func (L *State) ToInteger(index int) int {
 	return int(C.lua_tointeger(L.s, C.int(index)))
 }
 
-// lua_tonumber
-/*
- * [-0, +0, -]
- * Converts the Lua value at the given acceptable index to the C type lua_Number (see lua_Number). The Lua value must be a number or a string convertible to a number (see §2.2.1); otherwise, lua_tonumber returns 0.
- */
+// [lua_tonumber] -> [-0, +0, -]
+//
+// Converts the Lua value at the given acceptable index to the C type lua_Number (see lua_Number). The Lua value must be a number or a string convertible to a number (see §2.2.1); otherwise, lua_tonumber returns 0.
+//
+// [lua_tonumber]: https://www.lua.org/manual/5.1/manual.html#lua_tonumber
 func (L *State) ToNumber(index int) float64 {
 	return float64(C.lua_tonumber(L.s, C.int(index)))
 }
 
-// lua_yield
-/*
- * [-?, +?, -]
- * Yields a coroutine.
- */
+// [lua_yield] -> [-?, +?, -]
+//
+// Yields a coroutine.
+//
+// [lua_yield]: https://www.lua.org/manual/5.1/manual.html#lua_yield
 func (L *State) Yield(nresults int) int {
 	return int(C.lua_yield(L.s, C.int(nresults)))
 }
@@ -197,74 +197,74 @@ func (L *State) pcall(nargs, nresults, errfunc int) int {
 // Pushes on the stack the value of a global variable (lua_getglobal)
 func (L *State) GetGlobal(name string) { L.GetField(LUA_GLOBALSINDEX, name) }
 
-// lua_resume
-/*
- * [-?, +?, -]
- * Starts and resumes a coroutine in a given thread.
- */
+// [lua_resume] -> [-?, +?, -]
+//
+// Starts and resumes a coroutine in a given thread.
+//
+// [lua_resume]: https://www.lua.org/manual/5.1/manual.html#lua_resume
 func (L *State) Resume(narg int) int {
 	return int(C.lua_resume(L.s, C.int(narg)))
 }
 
-// lua_setglobal
-/*
- * [-1, +0, e]
- * Pops a value from the stack and sets it as the new value of global name. It is defined as a macro:
- */
+// [lua_setglobal] -> [-1, +0, e]
+//
+// Pops a value from the stack and sets it as the new value of global name. It is defined as a macro:
+//
+// [lua_setglobal]: https://www.lua.org/manual/5.1/manual.html#lua_setglobal
 func (L *State) SetGlobal(name string) {
 	Cname := C.CString(name)
 	defer C.free(unsafe.Pointer(Cname))
 	C.lua_setfield(L.s, C.int(LUA_GLOBALSINDEX), Cname)
 }
 
-// lua_insert
-/*
- * [-1, +1, -]
- * Moves the top element into the given valid index, shifting up the elements above this index to open space. Cannot be called with a pseudo-index, because a pseudo-index is not an actual stack position.
- */
+// [lua_insert] -> [-1, +1, -]
+//
+// Moves the top element into the given valid index, shifting up the elements above this index to open space. Cannot be called with a pseudo-index, because a pseudo-index is not an actual stack position.
+//
+// [lua_insert]: https://www.lua.org/manual/5.1/manual.html#lua_insert
 func (L *State) Insert(index int) { C.lua_insert(L.s, C.int(index)) }
 
-// lua_remove
-/*
- * [-1, +0, -]
- * Removes the element at the given valid index, shifting down the elements above this index to fill the gap. Cannot be called with a pseudo-index, because a pseudo-index is not an actual stack position.
- */
+// [lua_remove] -> [-1, +0, -]
+//
+// Removes the element at the given valid index, shifting down the elements above this index to fill the gap. Cannot be called with a pseudo-index, because a pseudo-index is not an actual stack position.
+//
+// [lua_remove]: https://www.lua.org/manual/5.1/manual.html#lua_remove
 func (L *State) Remove(index int) {
 	C.lua_remove(L.s, C.int(index))
 }
 
-// lua_replace
-/*
- * [-1, +0, -]
- * Moves the top element into the given position (and pops it), without shifting any element (therefore replacing the value at the given position).
- */
+// [lua_replace] -> [-1, +0, -]
+//
+// Moves the top element into the given position (and pops it), without shifting any element (therefore replacing the value at the given position).
+//
+// [lua_replace]: https://www.lua.org/manual/5.1/manual.html#lua_replace
 func (L *State) Replace(index int) {
 	C.lua_replace(L.s, C.int(index))
 }
 
-// lua_rawgeti
-/*
- * [-0, +1, -]
- * Pushes onto the stack the value t[n], where t is the value at the given valid index. The access is raw; that is, it does not invoke metamethods.
- */
+// [lua_rawgeti] -> [-0, +1, -]
+//
+// Pushes onto the stack the value t[n], where t is the value at the given valid index. The access is raw; that is, it does not invoke metamethods.
+//
+// [lua_rawgeti]: https://www.lua.org/manual/5.1/manual.html#lua_rawgeti
 func (L *State) RawGeti(index int, n int) {
 	C.lua_rawgeti(L.s, C.int(index), C.int(n))
 }
 
-// lua_rawseti
-/*
- * [-1, +0, m]
- * Does the equivalent of t[n] = v, where t is the value at the given valid index and v is the value at the top of the stack.
- */
+// [lua_rawseti] -> [-1, +0, m]
+//
+// Does the equivalent of t[n] = v, where t is the value at the given valid index and v is the value at the top of the stack.
+//
+// [lua_rawseti]: https://www.lua.org/manual/5.1/manual.html#lua_rawseti
 func (L *State) RawSeti(index int, n int) {
 	C.lua_rawseti(L.s, C.int(index), C.int(n))
 }
 
-// lua_gc
-/*
- * [-0, +0, e]
- * Controls the garbage collector.
- */
+// [lua_gc] -> [-0, +0, e]
+//
+// Controls the garbage collector.
+//
+// [lua_gc]: https://www.lua.org/manual/5.1/manual.html#lua_gc
 func (L *State) GC(what, data int) int {
 	return int(C.lua_gc(L.s, C.int(what), C.int(data)))
 }

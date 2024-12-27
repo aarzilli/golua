@@ -156,25 +156,25 @@ func (L *State) PushGoClosureWithUpvalues(f LuaGoFunction, nup uint) {
 	C.clua_pushcallback(L.s, C.uint(nup)) // wraps the userdata object with a closure making it into a function
 }
 
-// lua_upvalueid
+// lua_upvalueindex
 func (L *State) UpvalueIndex(n int) int {
 	return int(C.clua_upvalueindex(C.int32_t(n)))
 }
 
-// lua_setupvalue
-/*
- * [-(0|1), +0, -]
- * Sets the value of a closure's upvalue. It assigns the value at the top of the stack to the upvalue and returns its name. It also pops the value from the stack. Parameters funcindex and n are as in the lua_getupvalue (see lua_getupvalue).
- */
+// [lua_setupvalue] -> [-(0|1), +0, -]
+//
+// Sets the value of a closure's upvalue. It assigns the value at the top of the stack to the upvalue and returns its name. It also pops the value from the stack. Parameters funcindex and n are as in the lua_getupvalue (see lua_getupvalue).
+//
+// [lua_setupvalue]: https://www.lua.org/manual/5.1/manual.html#lua_setupvalue
 func (L *State) SetUpvalue(funcindex, n int) bool {
 	return C.lua_setupvalue(L.s, C.int(funcindex), C.int(n)) != nil
 }
 
-// lua_getupvalue
-/*
- * [-0, +(0|1), -]
- * Gets information about a closure's upvalue. (For Lua functions, upvalues are the external local variables that the function uses, and that are consequently included in its closure.) lua_getupvalue gets the index n of an upvalue, pushes the upvalue's value onto the stack, and returns its name. funcindex points to the closure in the stack. (Upvalues have no particular order, as they are active through the whole function. So, they are numbered in an arbitrary order.)
- */
+// [lua_getupvalue] -> [-0, +(0|1), -]
+//
+// Gets information about a closure's upvalue. (For Lua functions, upvalues are the external local variables that the function uses, and that are consequently included in its closure.) lua_getupvalue gets the index n of an upvalue, pushes the upvalue's value onto the stack, and returns its name. funcindex points to the closure in the stack. (Upvalues have no particular order, as they are active through the whole function. So, they are numbered in an arbitrary order.)
+//
+// [lua_getupvalue]: https://www.lua.org/manual/5.1/manual.html#lua_getupvalue
 func (L *State) GetUpvalue(funcindex, n int) {
 	C.lua_getupvalue(L.s, C.int(funcindex), C.int(n))
 }
@@ -272,11 +272,11 @@ func (L *State) callEx(nargs, nresults int, catch bool) (err error) {
 	return
 }
 
-// lua_call
-/*
- * [-(nargs + 1), +nresults, e]
- * Calls a function.
- */
+// [lua_call] -> [-(nargs + 1), +nresults, e]
+//
+// Calls a function.
+//
+// [lua_call]: https://www.lua.org/manual/5.1/manual.html#lua_call
 func (L *State) Call(nargs, nresults int) (err error) {
 	return L.callEx(nargs, nresults, true)
 }
@@ -286,75 +286,75 @@ func (L *State) MustCall(nargs, nresults int) {
 	L.callEx(nargs, nresults, false)
 }
 
-// lua_checkstack
-/*
- * [-0, +0, m]
- * Ensures that there are at least extra free stack slots in the stack. It returns false if it cannot grow the stack to that size. This function never shrinks the stack; if the stack is already larger than the new size, it is left unchanged.
- */
+// [lua_checkstack] -> [-0, +0, m]
+//
+// Ensures that there are at least extra free stack slots in the stack. It returns false if it cannot grow the stack to that size. This function never shrinks the stack; if the stack is already larger than the new size, it is left unchanged.
+//
+// [lua_checkstack]: https://www.lua.org/manual/5.1/manual.html#lua_checkstack
 func (L *State) CheckStack(extra int) bool {
 	return C.lua_checkstack(L.s, C.int(extra)) != 0
 }
 
-// lua_close
-/*
- * [-0, +0, -]
- * Destroys all objects in the given Lua state (calling the corresponding garbage-collection metamethods, if any) and frees all dynamic memory used by this state. On several platforms, you may not need to call this function, because all resources are naturally released when the host program ends. On the other hand, long-running programs, such as a daemon or a web server, might need to release states as soon as they are not needed, to avoid growing too large.
- */
+// [lua_close] -> [-0, +0, -]
+//
+// Destroys all objects in the given Lua state (calling the corresponding garbage-collection metamethods, if any) and frees all dynamic memory used by this state. On several platforms, you may not need to call this function, because all resources are naturally released when the host program ends. On the other hand, long-running programs, such as a daemon or a web server, might need to release states as soon as they are not needed, to avoid growing too large.
+//
+// [lua_close]: https://www.lua.org/manual/5.1/manual.html#lua_close
 func (L *State) Close() {
 	C.lua_close(L.s)
 	unregisterGoState(L)
 }
 
-// lua_concat
-/*
- * [-n, +1, e]
- * Concatenates the n values at the top of the stack, pops them, and leaves the result at the top. If n is 1, the result is the single value on the stack (that is, the function does nothing); if n is 0, the result is the empty string. Concatenation is performed following the usual semantics of Lua (see §2.5.4).
- */
+// [lua_concat] -> [-n, +1, e]
+//
+// Concatenates the n values at the top of the stack, pops them, and leaves the result at the top. If n is 1, the result is the single value on the stack (that is, the function does nothing); if n is 0, the result is the empty string. Concatenation is performed following the usual semantics of Lua (see §2.5.4).
+//
+// [lua_concat]: https://www.lua.org/manual/5.1/manual.html#lua_concat
 func (L *State) Concat(n int) {
 	C.lua_concat(L.s, C.int(n))
 }
 
-// lua_createtable
-/*
- * [-0, +1, m]
- * Creates a new empty table and pushes it onto the stack. The new table has space pre-allocated for narr array elements and nrec non-array elements. This pre-allocation is useful when you know exactly how many elements the table will have. Otherwise you can use the function lua_newtable.
- */
+// [lua_createtable] -> [-0, +1, m]
+//
+// Creates a new empty table and pushes it onto the stack. The new table has space pre-allocated for narr array elements and nrec non-array elements. This pre-allocation is useful when you know exactly how many elements the table will have. Otherwise you can use the function lua_newtable.
+//
+// [lua_createtable]: https://www.lua.org/manual/5.1/manual.html#lua_createtable
 func (L *State) CreateTable(narr int, nrec int) {
 	C.lua_createtable(L.s, C.int(narr), C.int(nrec))
 }
 
-// lua_getfield
-/*
- * [-0, +1, e]
- * Pushes onto the stack the value t[k], where t is the value at the given valid index. As in Lua, this function may trigger a metamethod for the "index" event (see §2.8).
- */
+// [lua_getfield] -> [-0, +1, e]
+//
+// Pushes onto the stack the value t[k], where t is the value at the given valid index. As in Lua, this function may trigger a metamethod for the "index" event (see §2.8).
+//
+// [lua_getfield]: https://www.lua.org/manual/5.1/manual.html#lua_getfield
 func (L *State) GetField(index int, k string) {
 	Ck := C.CString(k)
 	defer C.free(unsafe.Pointer(Ck))
 	C.lua_getfield(L.s, C.int(index), Ck)
 }
 
-// lua_getmetatable
-/*
- * [-0, +(0|1), -]
- * Pushes onto the stack the metatable of the value at the given acceptable index. If the index is not valid, or if the value does not have a metatable, the function returns 0 and pushes nothing on the stack.
- */
+// [lua_getmetatable] -> [-0, +(0|1), -]
+//
+// Pushes onto the stack the metatable of the value at the given acceptable index. If the index is not valid, or if the value does not have a metatable, the function returns 0 and pushes nothing on the stack.
+//
+// [lua_getmetatable]: https://www.lua.org/manual/5.1/manual.html#lua_getmetatable
 func (L *State) GetMetaTable(index int) bool {
 	return C.lua_getmetatable(L.s, C.int(index)) != 0
 }
 
-// lua_gettable
-/*
- * [-1, +1, e]
- * Pushes onto the stack the value t[k], where t is the value at the given valid index and k is the value at the top of the stack.
- */
+// [lua_gettable] -> [-1, +1, e]
+//
+// Pushes onto the stack the value t[k], where t is the value at the given valid index and k is the value at the top of the stack.
+//
+// [lua_gettable]: https://www.lua.org/manual/5.1/manual.html#lua_gettable
 func (L *State) GetTable(index int) { C.lua_gettable(L.s, C.int(index)) }
 
-// lua_gettop
-/*
- * [-0, +0, -]
- * Returns the index of the top element in the stack. Because indices start at 1, this result is equal to the number of elements in the stack (and so 0 means an empty stack).
- */
+// [lua_gettop] -> [-0, +0, -]
+//
+// Returns the index of the top element in the stack. Because indices start at 1, this result is equal to the number of elements in the stack (and so 0 means an empty stack).
+//
+// [lua_gettop]: https://www.lua.org/manual/5.1/manual.html#lua_gettop
 func (L *State) GetTop() int { return int(C.lua_gettop(L.s)) }
 
 // Returns true if lua_type == LUA_TBOOLEAN
@@ -382,64 +382,64 @@ func (L *State) IsLightUserdata(index int) bool {
 	return LuaValType(C.lua_type(L.s, C.int(index))) == LUA_TLIGHTUSERDATA
 }
 
-// lua_isnil
-/*
- * [-0, +0, -]
- * Returns 1 if the value at the given acceptable index is nil, and 0 otherwise.
- */
+// [lua_isnil] -> [-0, +0, -]
+//
+// Returns 1 if the value at the given acceptable index is nil, and 0 otherwise.
+//
+// [lua_isnil]: https://www.lua.org/manual/5.1/manual.html#lua_isnil
 func (L *State) IsNil(index int) bool { return LuaValType(C.lua_type(L.s, C.int(index))) == LUA_TNIL }
 
-// lua_isnone
-/*
- * [-0, +0, -]
- * Returns 1 if the given acceptable index is not valid (that is, it refers to an element outside the current stack), and 0 otherwise.
- */
+// [lua_isnone] -> [-0, +0, -]
+//
+// Returns 1 if the given acceptable index is not valid (that is, it refers to an element outside the current stack), and 0 otherwise.
+//
+// [lua_isnone]: https://www.lua.org/manual/5.1/manual.html#lua_isnone
 func (L *State) IsNone(index int) bool { return LuaValType(C.lua_type(L.s, C.int(index))) == LUA_TNONE }
 
-// lua_isnoneornil
-/*
- * [-0, +0, -]
- * Returns 1 if the given acceptable index is not valid (that is, it refers to an element outside the current stack) or if the value at this index is nil, and 0 otherwise.
- */
+// [lua_isnoneornil] -> [-0, +0, -]
+//
+// Returns 1 if the given acceptable index is not valid (that is, it refers to an element outside the current stack) or if the value at this index is nil, and 0 otherwise.
+//
+// [lua_isnoneornil]: https://www.lua.org/manual/5.1/manual.html#lua_isnoneornil
 func (L *State) IsNoneOrNil(index int) bool { return int(C.lua_type(L.s, C.int(index))) <= 0 }
 
-// lua_isnumber
-/*
- * [-0, +0, -]
- * Returns 1 if the value at the given acceptable index is a number or a string convertible to a number, and 0 otherwise.
- */
+// [lua_isnumber] -> [-0, +0, -]
+//
+// Returns 1 if the value at the given acceptable index is a number or a string convertible to a number, and 0 otherwise.
+//
+// [lua_isnumber]: https://www.lua.org/manual/5.1/manual.html#lua_isnumber
 func (L *State) IsNumber(index int) bool { return C.lua_isnumber(L.s, C.int(index)) == 1 }
 
-// lua_isstring
-/*
- * [-0, +0, -]
- * Returns 1 if the value at the given acceptable index is a string or a number (which is always convertible to a string), and 0 otherwise.
- */
+// [lua_isstring] -> [-0, +0, -]
+//
+// Returns 1 if the value at the given acceptable index is a string or a number (which is always convertible to a string), and 0 otherwise.
+//
+// [lua_isstring]: https://www.lua.org/manual/5.1/manual.html#lua_isstring
 func (L *State) IsString(index int) bool { return C.lua_isstring(L.s, C.int(index)) == 1 }
 
-// lua_istable
-/*
- * [-0, +0, -]
- * Returns 1 if the value at the given acceptable index is a table, and 0 otherwise.
- */
+// [lua_istable] -> [-0, +0, -]
+//
+// Returns 1 if the value at the given acceptable index is a table, and 0 otherwise.
+//
+// [lua_istable]: https://www.lua.org/manual/5.1/manual.html#lua_istable
 func (L *State) IsTable(index int) bool {
 	return LuaValType(C.lua_type(L.s, C.int(index))) == LUA_TTABLE
 }
 
-// lua_isthread
-/*
- * [-0, +0, -]
- * Returns 1 if the value at the given acceptable index is a thread, and 0 otherwise.
- */
+// [lua_isthread] -> [-0, +0, -]
+//
+// Returns 1 if the value at the given acceptable index is a thread, and 0 otherwise.
+//
+// [lua_isthread]: https://www.lua.org/manual/5.1/manual.html#lua_isthread
 func (L *State) IsThread(index int) bool {
 	return LuaValType(C.lua_type(L.s, C.int(index))) == LUA_TTHREAD
 }
 
-// lua_isuserdata
-/*
- * [-0, +0, -]
- * Returns 1 if the value at the given acceptable index is a userdata (either full or light), and 0 otherwise.
- */
+// [lua_isuserdata] -> [-0, +0, -]
+//
+// Returns 1 if the value at the given acceptable index is a userdata (either full or light), and 0 otherwise.
+//
+// [lua_isuserdata]: https://www.lua.org/manual/5.1/manual.html#lua_isuserdata
 func (L *State) IsUserdata(index int) bool { return C.lua_isuserdata(L.s, C.int(index)) == 1 }
 
 // Creates a new lua interpreter state with the given allocation function
@@ -450,20 +450,20 @@ func NewStateAlloc(f Alloc) *State {
 	return L
 }
 
-// lua_newtable
-/*
- * [-0, +1, m]
- * Creates a new empty table and pushes it onto the stack. It is equivalent to lua_createtable(L, 0, 0).
- */
+// [lua_newtable] -> [-0, +1, m]
+//
+// Creates a new empty table and pushes it onto the stack. It is equivalent to lua_createtable(L, 0, 0).
+//
+// [lua_newtable]: https://www.lua.org/manual/5.1/manual.html#lua_newtable
 func (L *State) NewTable() {
 	C.lua_createtable(L.s, 0, 0)
 }
 
-// lua_newthread
-/*
- * [-0, +1, m]
- * Creates a new thread, pushes it on the stack, and returns a pointer to a lua_State that represents this new thread. The new state returned by this function shares with the original state all global objects (such as tables), but has an independent execution stack.
- */
+// [lua_newthread] -> [-0, +1, m]
+//
+// Creates a new thread, pushes it on the stack, and returns a pointer to a lua_State that represents this new thread. The new state returned by this function shares with the original state all global objects (such as tables), but has an independent execution stack.
+//
+// [lua_newthread]: https://www.lua.org/manual/5.1/manual.html#lua_newthread
 func (L *State) NewThread() *State {
 	// TODO: call newState with result from C.lua_newthread and return it
 	// TODO: should have same lists as parent
@@ -472,36 +472,36 @@ func (L *State) NewThread() *State {
 	return &State{s, 0, nil, nil, nil, nil, nil}
 }
 
-// lua_next
-/*
- * [-1, +(2|0), e]
- * Pops a key from the stack, and pushes a key-value pair from the table at the given index (the "next" pair after the given key). If there are no more elements in the table, then lua_next returns 0 (and pushes nothing).
- */
+// [lua_next] -> [-1, +(2|0), e]
+//
+// Pops a key from the stack, and pushes a key-value pair from the table at the given index (the "next" pair after the given key). If there are no more elements in the table, then lua_next returns 0 (and pushes nothing).
+//
+// [lua_next]: https://www.lua.org/manual/5.1/manual.html#lua_next
 func (L *State) Next(index int) int {
 	return int(C.lua_next(L.s, C.int(index)))
 }
 
-// lua_objlen
-/*
- * [-0, +0, -]
- * Returns the "length" of the value at the given acceptable index: for strings, this is the string length; for tables, this is the result of the length operator ('#'); for userdata, this is the size of the block of memory allocated for the userdata; for other values, it is 0.
- */
-// lua_pop
-/*
- * [-n, +0, -]
- * Pops n elements from the stack.
- */
+// [lua_objlen] -> [-0, +0, -]
+//
+// Returns the "length" of the value at the given acceptable index: for strings, this is the string length; for tables, this is the result of the length operator ('#'); for userdata, this is the size of the block of memory allocated for the userdata; for other values, it is 0.
+//
+// [lua_objlen]: https://www.lua.org/manual/5.1/manual.html#lua_objlen
+// [lua_pop] -> [-n, +0, -]
+//
+// Pops n elements from the stack.
+//
+// [lua_pop]: https://www.lua.org/manual/5.1/manual.html#lua_pop
 func (L *State) Pop(n int) {
 	// Why is this implemented this way? I don't get it...
 	// C.lua_pop(L.s, C.int(n));
 	C.lua_settop(L.s, C.int(-n-1))
 }
 
-// lua_pushboolean
-/*
- * [-0, +1, -]
- * Pushes a boolean value with value b onto the stack.
- */
+// [lua_pushboolean] -> [-0, +1, -]
+//
+// Pushes a boolean value with value b onto the stack.
+//
+// [lua_pushboolean]: https://www.lua.org/manual/5.1/manual.html#lua_pushboolean
 func (L *State) PushBoolean(b bool) {
 	var bint int
 	if b {
@@ -512,11 +512,11 @@ func (L *State) PushBoolean(b bool) {
 	C.lua_pushboolean(L.s, C.int(bint))
 }
 
-// lua_pushstring
-/*
- * [-0, +1, m]
- * Pushes the zero-terminated string pointed to by s onto the stack. Lua makes (or reuses) an internal copy of the given string, so the memory at s can be freed or reused immediately after the function returns. The string cannot contain embedded zeros; it is assumed to end at the first zero.
- */
+// [lua_pushstring] -> [-0, +1, m]
+//
+// Pushes the zero-terminated string pointed to by s onto the stack. Lua makes (or reuses) an internal copy of the given string, so the memory at s can be freed or reused immediately after the function returns. The string cannot contain embedded zeros; it is assumed to end at the first zero.
+//
+// [lua_pushstring]: https://www.lua.org/manual/5.1/manual.html#lua_pushstring
 func (L *State) PushString(str string) {
 	Cstr := C.CString(str)
 	defer C.free(unsafe.Pointer(Cstr))
@@ -527,74 +527,74 @@ func (L *State) PushBytes(b []byte) {
 	C.lua_pushlstring(L.s, (*C.char)(unsafe.Pointer(&b[0])), C.size_t(len(b)))
 }
 
-// lua_pushinteger
-/*
- * [-0, +1, -]
- * Pushes a number with value n onto the stack.
- */
+// [lua_pushinteger] -> [-0, +1, -]
+//
+// Pushes a number with value n onto the stack.
+//
+// [lua_pushinteger]: https://www.lua.org/manual/5.1/manual.html#lua_pushinteger
 func (L *State) PushInteger(n int64) {
 	C.lua_pushinteger(L.s, C.lua_Integer(n))
 }
 
-// lua_pushnil
-/*
- * [-0, +1, -]
- * Pushes a nil value onto the stack.
- */
+// [lua_pushnil] -> [-0, +1, -]
+//
+// Pushes a nil value onto the stack.
+//
+// [lua_pushnil]: https://www.lua.org/manual/5.1/manual.html#lua_pushnil
 func (L *State) PushNil() {
 	C.lua_pushnil(L.s)
 }
 
-// lua_pushnumber
-/*
- * [-0, +1, -]
- * Pushes a number with value n onto the stack.
- */
+// [lua_pushnumber] -> [-0, +1, -]
+//
+// Pushes a number with value n onto the stack.
+//
+// [lua_pushnumber]: https://www.lua.org/manual/5.1/manual.html#lua_pushnumber
 func (L *State) PushNumber(n float64) {
 	C.lua_pushnumber(L.s, C.lua_Number(n))
 }
 
-// lua_pushthread
-/*
- * [-0, +1, -]
- * Pushes the thread represented by L onto the stack. Returns 1 if this thread is the main thread of its state.
- */
+// [lua_pushthread] -> [-0, +1, -]
+//
+// Pushes the thread represented by L onto the stack. Returns 1 if this thread is the main thread of its state.
+//
+// [lua_pushthread]: https://www.lua.org/manual/5.1/manual.html#lua_pushthread
 func (L *State) PushThread() (isMain bool) {
 	return C.lua_pushthread(L.s) != 0
 }
 
-// lua_pushvalue
-/*
- * [-0, +1, -]
- * Pushes a copy of the element at the given valid index onto the stack.
- */
+// [lua_pushvalue] -> [-0, +1, -]
+//
+// Pushes a copy of the element at the given valid index onto the stack.
+//
+// [lua_pushvalue]: https://www.lua.org/manual/5.1/manual.html#lua_pushvalue
 func (L *State) PushValue(index int) {
 	C.lua_pushvalue(L.s, C.int(index))
 }
 
-// lua_rawequal
-/*
- * [-0, +0, -]
- * Returns 1 if the two values in acceptable indices index1 and index2 are primitively equal (that is, without calling metamethods). Otherwise returns 0. Also returns 0 if any of the indices are non valid.
- */
+// [lua_rawequal] -> [-0, +0, -]
+//
+// Returns 1 if the two values in acceptable indices index1 and index2 are primitively equal (that is, without calling metamethods). Otherwise returns 0. Also returns 0 if any of the indices are non valid.
+//
+// [lua_rawequal]: https://www.lua.org/manual/5.1/manual.html#lua_rawequal
 func (L *State) RawEqual(index1 int, index2 int) bool {
 	return C.lua_rawequal(L.s, C.int(index1), C.int(index2)) != 0
 }
 
-// lua_rawget
-/*
- * [-1, +1, -]
- * Similar to lua_gettable, but does a raw access (i.e., without metamethods).
- */
+// [lua_rawget] -> [-1, +1, -]
+//
+// Similar to lua_gettable, but does a raw access (i.e., without metamethods).
+//
+// [lua_rawget]: https://www.lua.org/manual/5.1/manual.html#lua_rawget
 func (L *State) RawGet(index int) {
 	C.lua_rawget(L.s, C.int(index))
 }
 
-// lua_rawset
-/*
- * [-2, +0, m]
- * Similar to lua_settable, but does a raw assignment (i.e., without metamethods).
- */
+// [lua_rawset] -> [-2, +0, m]
+//
+// Similar to lua_settable, but does a raw assignment (i.e., without metamethods).
+//
+// [lua_rawset]: https://www.lua.org/manual/5.1/manual.html#lua_rawset
 func (L *State) RawSet(index int) {
 	C.lua_rawset(L.s, C.int(index))
 }
@@ -628,68 +628,68 @@ func (L *State) RegisterLibrary(name string, funcs map[string]LuaGoFunction) {
 	}
 }
 
-// lua_setallocf
-/*
- * [-0, +0, -]
- * Changes the allocator function of a given state to f with user data ud.
- */
+// [lua_setallocf] -> [-0, +0, -]
+//
+// Changes the allocator function of a given state to f with user data ud.
+//
+// [lua_setallocf]: https://www.lua.org/manual/5.1/manual.html#lua_setallocf
 func (L *State) SetAllocf(f Alloc) {
 	L.allocfn = &f
 	C.clua_setallocf(L.s, unsafe.Pointer(L.allocfn))
 }
 
-// lua_setfield
-/*
- * [-1, +0, e]
- * Does the equivalent to t[k] = v, where t is the value at the given valid index and v is the value at the top of the stack.
- */
+// [lua_setfield] -> [-1, +0, e]
+//
+// Does the equivalent to t[k] = v, where t is the value at the given valid index and v is the value at the top of the stack.
+//
+// [lua_setfield]: https://www.lua.org/manual/5.1/manual.html#lua_setfield
 func (L *State) SetField(index int, k string) {
 	Ck := C.CString(k)
 	defer C.free(unsafe.Pointer(Ck))
 	C.lua_setfield(L.s, C.int(index), Ck)
 }
 
-// lua_setmetatable
-/*
- * [-1, +0, -]
- * Pops a table from the stack and sets it as the new metatable for the value at the given acceptable index.
- */
+// [lua_setmetatable] -> [-1, +0, -]
+//
+// Pops a table from the stack and sets it as the new metatable for the value at the given acceptable index.
+//
+// [lua_setmetatable]: https://www.lua.org/manual/5.1/manual.html#lua_setmetatable
 func (L *State) SetMetaTable(index int) {
 	C.lua_setmetatable(L.s, C.int(index))
 }
 
-// lua_settable
-/*
- * [-2, +0, e]
- * Does the equivalent to t[k] = v, where t is the value at the given valid index, v is the value at the top of the stack, and k is the value just below the top.
- */
+// [lua_settable] -> [-2, +0, e]
+//
+// Does the equivalent to t[k] = v, where t is the value at the given valid index, v is the value at the top of the stack, and k is the value just below the top.
+//
+// [lua_settable]: https://www.lua.org/manual/5.1/manual.html#lua_settable
 func (L *State) SetTable(index int) {
 	C.lua_settable(L.s, C.int(index))
 }
 
-// lua_settop
-/*
- * [-?, +?, -]
- * Accepts any acceptable index, or 0, and sets the stack top to this index. If the new top is larger than the old one, then the new elements are filled with nil. If index is 0, then all stack elements are removed.
- */
+// [lua_settop] -> [-?, +?, -]
+//
+// Accepts any acceptable index, or 0, and sets the stack top to this index. If the new top is larger than the old one, then the new elements are filled with nil. If index is 0, then all stack elements are removed.
+//
+// [lua_settop]: https://www.lua.org/manual/5.1/manual.html#lua_settop
 func (L *State) SetTop(index int) {
 	C.lua_settop(L.s, C.int(index))
 }
 
-// lua_status
-/*
- * [-0, +0, -]
- * Returns the status of the thread L.
- */
+// [lua_status] -> [-0, +0, -]
+//
+// Returns the status of the thread L.
+//
+// [lua_status]: https://www.lua.org/manual/5.1/manual.html#lua_status
 func (L *State) Status() int {
 	return int(C.lua_status(L.s))
 }
 
-// lua_toboolean
-/*
- * [-0, +0, -]
- * Converts the Lua value at the given acceptable index to a C boolean value (0 or 1). Like all tests in Lua, lua_toboolean returns 1 for any Lua value different from false and nil; otherwise it returns 0. It also returns 0 when called with a non-valid index. (If you want to accept only actual boolean values, use lua_isboolean to test the value's type.)
- */
+// [lua_toboolean] -> [-0, +0, -]
+//
+// Converts the Lua value at the given acceptable index to a C boolean value (0 or 1). Like all tests in Lua, lua_toboolean returns 1 for any Lua value different from false and nil; otherwise it returns 0. It also returns 0 when called with a non-valid index. (If you want to accept only actual boolean values, use lua_isboolean to test the value's type.)
+//
+// [lua_toboolean]: https://www.lua.org/manual/5.1/manual.html#lua_toboolean
 func (L *State) ToBoolean(index int) bool {
 	return C.lua_toboolean(L.s, C.int(index)) != 0
 }
@@ -718,11 +718,11 @@ func (L *State) ToGoStruct(index int) (f interface{}) {
 	return L.registry[fid]
 }
 
-// lua_tostring
-/*
- * [-0, +0, m]
- * Equivalent to lua_tolstring with len equal to NULL.
- */
+// [lua_tostring] -> [-0, +0, m]
+//
+// Equivalent to lua_tolstring with len equal to NULL.
+//
+// [lua_tostring]: https://www.lua.org/manual/5.1/manual.html#lua_tostring
 func (L *State) ToString(index int) string {
 	var size C.size_t
 	r := C.lua_tolstring(L.s, C.int(index), &size)
@@ -735,57 +735,57 @@ func (L *State) ToBytes(index int) []byte {
 	return C.GoBytes(unsafe.Pointer(b), C.int(size))
 }
 
-// lua_topointer
-/*
- * [-0, +0, -]
- * Converts the value at the given acceptable index to a generic C pointer (void*). The value can be a userdata, a table, a thread, or a function; otherwise, lua_topointer returns NULL. Different objects will give different pointers. There is no way to convert the pointer back to its original value.
- */
+// [lua_topointer] -> [-0, +0, -]
+//
+// Converts the value at the given acceptable index to a generic C pointer (void*). The value can be a userdata, a table, a thread, or a function; otherwise, lua_topointer returns NULL. Different objects will give different pointers. There is no way to convert the pointer back to its original value.
+//
+// [lua_topointer]: https://www.lua.org/manual/5.1/manual.html#lua_topointer
 func (L *State) ToPointer(index int) uintptr {
 	return uintptr(C.lua_topointer(L.s, C.int(index)))
 }
 
-// lua_tothread
-/*
- * [-0, +0, -]
- * Converts the value at the given acceptable index to a Lua thread (represented as lua_State*). This value must be a thread; otherwise, the function returns NULL.
- */
+// [lua_tothread] -> [-0, +0, -]
+//
+// Converts the value at the given acceptable index to a Lua thread (represented as lua_State*). This value must be a thread; otherwise, the function returns NULL.
+//
+// [lua_tothread]: https://www.lua.org/manual/5.1/manual.html#lua_tothread
 func (L *State) ToThread(index int) *State {
 	// TODO: find a way to link lua_State* to existing *State, return that
 	return &State{}
 }
 
-// lua_touserdata
-/*
- * [-0, +0, -]
- * If the value at the given acceptable index is a full userdata, returns its block address. If the value is a light userdata, returns its pointer. Otherwise, returns NULL.
- */
+// [lua_touserdata] -> [-0, +0, -]
+//
+// If the value at the given acceptable index is a full userdata, returns its block address. If the value is a light userdata, returns its pointer. Otherwise, returns NULL.
+//
+// [lua_touserdata]: https://www.lua.org/manual/5.1/manual.html#lua_touserdata
 func (L *State) ToUserdata(index int) unsafe.Pointer {
 	return unsafe.Pointer(C.lua_touserdata(L.s, C.int(index)))
 }
 
-// lua_type
-/*
- * [-0, +0, -]
- * Returns the type of the value in the given acceptable index, or LUA_TNONE for a non-valid index (that is, an index to an "empty" stack position). The types returned by lua_type are coded by the following constants defined in lua.h: LUA_TNIL, LUA_TNUMBER, LUA_TBOOLEAN, LUA_TSTRING, LUA_TTABLE, LUA_TFUNCTION, LUA_TUSERDATA, LUA_TTHREAD, and LUA_TLIGHTUSERDATA.
- */
+// [lua_type] -> [-0, +0, -]
+//
+// Returns the type of the value in the given acceptable index, or LUA_TNONE for a non-valid index (that is, an index to an "empty" stack position). The types returned by lua_type are coded by the following constants defined in lua.h: LUA_TNIL, LUA_TNUMBER, LUA_TBOOLEAN, LUA_TSTRING, LUA_TTABLE, LUA_TFUNCTION, LUA_TUSERDATA, LUA_TTHREAD, and LUA_TLIGHTUSERDATA.
+//
+// [lua_type]: https://www.lua.org/manual/5.1/manual.html#lua_type
 func (L *State) Type(index int) LuaValType {
 	return LuaValType(C.lua_type(L.s, C.int(index)))
 }
 
-// lua_typename
-/*
- * [-0, +0, -]
- * Returns the name of the type encoded by the value tp, which must be one the values returned by lua_type.
- */
+// [lua_typename] -> [-0, +0, -]
+//
+// Returns the name of the type encoded by the value tp, which must be one the values returned by lua_type.
+//
+// [lua_typename]: https://www.lua.org/manual/5.1/manual.html#lua_typename
 func (L *State) Typename(tp int) string {
 	return C.GoString(C.lua_typename(L.s, C.int(tp)))
 }
 
-// lua_xmove
-/*
- * [-?, +?, -]
- * Exchange values between different threads of the same global state.
- */
+// [lua_xmove] -> [-?, +?, -]
+//
+// Exchange values between different threads of the same global state.
+//
+// [lua_xmove]: https://www.lua.org/manual/5.1/manual.html#lua_xmove
 func XMove(from *State, to *State, n int) {
 	C.lua_xmove(from.s, to.s, C.int(n))
 }

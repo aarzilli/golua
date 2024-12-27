@@ -45,7 +45,6 @@ func main() {
 	if *flagClean {
 		updatedCode = removeOldDocumentation(string(goCode))
 	} else {
-
 		// Fetch or load cached Lua documentation
 		luadocs, err := getCachedLuaDocs()
 		if err != nil {
@@ -64,7 +63,7 @@ func main() {
 	}
 
 	if *flagDoWrite {
-		err := os.WriteFile(goFile, []byte(updatedCode), 0644)
+		err := os.WriteFile(goFile, []byte(updatedCode), 0o644)
 		if err != nil {
 			fmt.Println("Error writing annotated code to file:", err)
 			os.Exit(1)
@@ -82,7 +81,7 @@ func getCachedLuaDocs() (string, error) {
 
 	// Ensure cache directory exists
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
-		err := os.Mkdir(cacheDir, 0755)
+		err := os.Mkdir(cacheDir, 0o755)
 		if err != nil {
 			return "", err
 		}
@@ -98,7 +97,7 @@ func getCachedLuaDocs() (string, error) {
 		body = string(cachedBody)
 	} else {
 		// Fetch Lua manual and cache it
-		url := fmt.Sprintf("https://www.lua.org/manual/%s/manual.html", *flagLuaVersion) // Change version as needed
+		url := luaManualURL("")
 		resp, err := http.Get(url)
 		if err != nil {
 			return "", err
@@ -115,7 +114,7 @@ func getCachedLuaDocs() (string, error) {
 		}
 		body = string(bodyBytes)
 
-		err = os.WriteFile(cacheFile, bodyBytes, 0644)
+		err = os.WriteFile(cacheFile, bodyBytes, 0o644)
 		if err != nil {
 			return "", err
 		}
@@ -130,6 +129,10 @@ type LuaFunction struct {
 	Description string
 }
 
+func luaManualURL(anchor string) string {
+	return fmt.Sprintf("https://www.lua.org/manual/%s/manual.html#%s", *flagLuaVersion, anchor) // Change version as needed
+}
+
 func parseLuaDocs(html string) (map[string]LuaFunction, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
@@ -138,7 +141,7 @@ func parseLuaDocs(html string) (map[string]LuaFunction, error) {
 
 	functions := map[string]LuaFunction{}
 
-	doc.Find("hr + h3").Has("a[name^='lua_']").Each(func(i int, s *goquery.Selection) {
+	doc.Find("hr + h3").Has("a[name^='lua']").Each(func(i int, s *goquery.Selection) {
 		var luaFunc LuaFunction
 
 		// Extract name
@@ -167,8 +170,8 @@ func parseLuaDocs(html string) (map[string]LuaFunction, error) {
 }
 
 func removeOldDocumentation(code string) string {
-	blockCommentRegex := regexp.MustCompile(`(?m)(// lua_.*$\n)/\*\n(?: \*.*$\n)+[ ]?\*/$\n`)
-	return blockCommentRegex.ReplaceAllString(code, "$1")
+	blockCommentRegex := regexp.MustCompile(`(?m)// \[(lua.*)\] -> .*$\n(// .*$\n)+`)
+	return blockCommentRegex.ReplaceAllString(code, "// $1\n")
 }
 
 // Add documentation comments to the Go code
@@ -178,16 +181,22 @@ func addDocumentation(code string, luaFuncs map[string]LuaFunction) string {
 	lines := strings.Split(code, "\n")
 	var annotatedLines []string
 
+	matchComment := regexp.MustCompile(`// luaL?_.+`)
+
 	for _, line := range lines {
-		annotatedLines = append(annotatedLines, line)
-		if strings.HasPrefix(line, "// lua_") {
+		if matchComment.MatchString(line) {
 			functionName := strings.TrimPrefix(line, "// ")
-			if doc, exists := luaFuncs[functionName]; exists {
-				annotatedLines = append(annotatedLines, "/*")
-				annotatedLines = append(annotatedLines, " * "+doc.StackEffect)
-				annotatedLines = append(annotatedLines, " * "+doc.Description)
-				annotatedLines = append(annotatedLines, " */")
+			if doc, exists := luaFuncs[strings.ToLower(functionName)]; exists {
+				annotatedLines = append(annotatedLines, fmt.Sprintf("// [%s] -> %s", doc.Name, doc.StackEffect))
+				annotatedLines = append(annotatedLines, "//")
+				annotatedLines = append(annotatedLines, "// "+doc.Description)
+				annotatedLines = append(annotatedLines, "//")
+				annotatedLines = append(annotatedLines, fmt.Sprintf("// [%s]: %s", doc.Name, luaManualURL(strings.ToLower(doc.Name))))
+			} else {
+				annotatedLines = append(annotatedLines, "// "+functionName)
 			}
+		} else {
+			annotatedLines = append(annotatedLines, line)
 		}
 	}
 

@@ -1,8 +1,4 @@
-// lua_upvalueid
-/*
- * [-0, +0, –]
- * Returns a unique identifier for the upvalue numbered n from the closure at index funcindex.
-*/
+// lua_upvalueindex
 func (L *State) UpvalueIndex(n int) int {
 	return int(C.clua_upvalueindex(C.int32_t(n)))
 }
