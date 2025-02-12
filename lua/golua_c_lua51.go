@@ -112,7 +112,7 @@ import "C"
 import "unsafe"
 
 func luaToInteger(s *C.lua_State, n C.int) C.long {
-	return C.lua_tointeger(s, n)
+	return C.long(C.lua_tointeger(s, n))
 }
 
 func luaToNumber(s *C.lua_State, n C.int) C.double {
