@@ -248,28 +248,79 @@ func (L *State) AtPanic(panicf LuaGoFunction) (oldpanicf LuaGoFunction) {
 func (L *State) callEx(nargs, nresults int, catch bool) (err error) {
 	if catch {
 		defer func() {
-			if err2 := recover(); err2 != nil {
-				if _, ok := err2.(error); ok {
-					err = err2.(error)
+			if r := recover(); r != nil {
+				switch x := r.(type) {
+				case error:
+					err = x
+				default:
+					err = fmt.Errorf("panic: %v", x)
 				}
-				return
 			}
 		}()
 	}
 
 	L.GetGlobal(C.GOLUA_DEFAULT_MSGHANDLER)
-	// We must record where we put the error handler in the stack otherwise it will be impossible to remove after the pcall when nresults == LUA_MULTRET
 	erridx := L.GetTop() - nargs - 1
 	L.Insert(erridx)
+
+	M := L.shared
+	M.pendingTrace = nil
+	M.pendingPanic = nil
 	r := L.pcall(nargs, nresults, erridx)
 	L.Remove(erridx)
+
 	if r != 0 {
-		err = &LuaError{r, L.ToString(-1), L.StackTrace()}
-		if !catch {
+		message := L.ToString(-1)
+
+		// A Go callback panicked during this call: the panic was contained at
+		// the cgo boundary and re-raised as a lua_error (see
+		// pushRecoveredError). Surface the ORIGINAL recovered value so
+		// existing code observes exactly the pre-containment behavior
+		// (RaiseError's *LuaError with its own code/trace, custom errors
+		// as-is, non-error values wrapped). The message guard discards a
+		// stale value left behind when a Lua-level pcall caught the error.
+		if pp := M.pendingPanic; pp != nil && M.pendingPanicMsg == message {
+			M.pendingPanic = nil
+			M.pendingTrace = nil
+			switch x := pp.(type) {
+			case error:
+				err = x
+			default:
+				err = fmt.Errorf("panic: %v", x)
+			}
+			if catch {
+				return
+			}
 			panic(err)
 		}
+		M.pendingPanic = nil
+
+		// The message handler captured the trace while the erroring stack
+		// was still alive; the stack is unwound now.
+		trace := M.pendingTrace
+		M.pendingTrace = nil
+		code := r
+		if trace == nil {
+			trace = L.StackTrace()
+		} else {
+			// The default message handler ran: report LUA_ERRERR as the
+			// error code, matching the historical behavior in which the
+			// handler itself built the LuaError with that constant.
+			code = LUA_ERRERR
+		}
+		luaErr := &LuaError{
+			code:       code,
+			message:    message,
+			stackTrace: trace,
+		}
+		if catch {
+			err = luaErr
+			return
+		}
+		panic(luaErr)
 	}
-	return
+
+	return nil
 }
 
 // [lua_call] -> [-(nargs + 1), +nresults, e]
