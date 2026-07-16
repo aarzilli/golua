@@ -65,76 +65,76 @@ type LuaStackEntry struct {
 }
 
 func newState(L *C.lua_State) *State {
-	newstate := &State{L, 0, make([]interface{}, 0, 8), make([]uint, 0, 8), nil, nil, nil}
-	registerGoState(newstate)
+	sh := &sharedState{
+		registry:    make([]interface{}, 0, 8),
+		freeIndices: make([]uint, 0, 8),
+	}
+	newstate := &State{s: L, Index: registerGoState(sh), shared: sh}
 	C.clua_setgostate(L, C.size_t(newstate.Index))
 	C.clua_initstate(L)
 	return newstate
 }
 
-func (L *State) addFreeIndex(i uint) {
-	freelen := len(L.freeIndices)
+// The registry / free-list helpers live on sharedState: the bookkeeping is
+// VM-wide and shared by the main state and every coroutine thread wrapper.
+
+func (sh *sharedState) addFreeIndex(i uint) {
+	freelen := len(sh.freeIndices)
 	// reallocate if necessary
-	if freelen+1 > cap(L.freeIndices) {
-		newSlice := make([]uint, freelen, cap(L.freeIndices)*2)
-		copy(newSlice, L.freeIndices)
-		L.freeIndices = newSlice
+	if freelen+1 > cap(sh.freeIndices) {
+		newSlice := make([]uint, freelen, cap(sh.freeIndices)*2)
+		copy(newSlice, sh.freeIndices)
+		sh.freeIndices = newSlice
 	}
 	// reslice
-	L.freeIndices = L.freeIndices[0 : freelen+1]
-	L.freeIndices[freelen] = i
+	sh.freeIndices = sh.freeIndices[0 : freelen+1]
+	sh.freeIndices[freelen] = i
 }
 
-func (L *State) getFreeIndex() (index uint, ok bool) {
-	freelen := len(L.freeIndices)
+func (sh *sharedState) getFreeIndex() (index uint, ok bool) {
+	freelen := len(sh.freeIndices)
 	// if there exist entries in the freelist
 	if freelen > 0 {
-		i := L.freeIndices[freelen-1] // get index
-		// fmt.Printf("Free indices before: %v\n", L.freeIndices)
-		L.freeIndices = L.freeIndices[0 : freelen-1] //'pop' index from list
-		// fmt.Printf("Free indices after: %v\n", L.freeIndices)
+		i := sh.freeIndices[freelen-1]                 // get index
+		sh.freeIndices = sh.freeIndices[0 : freelen-1] //'pop' index from list
 		return i, true
 	}
 	return 0, false
 }
 
 // returns the registered function id
-func (L *State) register(f interface{}) uint {
-	// fmt.Printf("Registering %v\n")
-	index, ok := L.getFreeIndex()
-	// fmt.Printf("\tfreeindex: index = %v, ok = %v\n", index, ok)
+func (sh *sharedState) register(f interface{}) uint {
+	index, ok := sh.getFreeIndex()
 	// if not ok, then we need to add new index by extending the slice
 	if !ok {
-		index = uint(len(L.registry))
+		index = uint(len(sh.registry))
 		// reallocate backing array if necessary
-		if index+1 > uint(cap(L.registry)) {
-			newcap := cap(L.registry) * 2
+		if index+1 > uint(cap(sh.registry)) {
+			newcap := cap(sh.registry) * 2
 			if index+1 > uint(newcap) {
 				newcap = int(index + 1)
 			}
 			newSlice := make([]interface{}, index, newcap)
-			copy(newSlice, L.registry)
-			L.registry = newSlice
+			copy(newSlice, sh.registry)
+			sh.registry = newSlice
 		}
 		// reslice
-		L.registry = L.registry[0 : index+1]
+		sh.registry = sh.registry[0 : index+1]
 	}
-	// fmt.Printf("\tregistering %d %v\n", index, f)
-	L.registry[index] = f
+	sh.registry[index] = f
 	return index
 }
 
-func (L *State) unregister(fid uint) {
-	// fmt.Printf("Unregistering %d (len: %d, value: %v)\n", fid, len(L.registry), L.registry[fid])
-	if (fid < uint(len(L.registry))) && (L.registry[fid] != nil) {
-		L.registry[fid] = nil
-		L.addFreeIndex(fid)
+func (sh *sharedState) unregister(fid uint) {
+	if (fid < uint(len(sh.registry))) && (sh.registry[fid] != nil) {
+		sh.registry[fid] = nil
+		sh.addFreeIndex(fid)
 	}
 }
 
 // Like lua_pushcfunction pushes onto the stack a go function as user data
 func (L *State) PushGoFunction(f LuaGoFunction) {
-	fid := L.register(f)
+	fid := L.shared.register(f)
 	C.clua_pushgofunction(L.s, C.uint(fid))
 }
 
@@ -203,7 +203,7 @@ func (L *State) SetMetaMethod(methodName string, f LuaGoFunction) {
 //
 // The user data will be rigged so that lua code can access and change to public members of simple types directly
 func (L *State) PushGoStruct(iface interface{}) {
-	iid := L.register(iface)
+	iid := L.shared.register(iface)
 	C.clua_pushgostruct(L.s, C.uint(iid))
 }
 
@@ -226,14 +226,14 @@ func (L *State) NewUserdata(size uintptr) unsafe.Pointer {
 func (L *State) AtPanic(panicf LuaGoFunction) (oldpanicf LuaGoFunction) {
 	fid := uint(0)
 	if panicf != nil {
-		fid = L.register(panicf)
+		fid = L.shared.register(panicf)
 	}
 	oldres := interface{}(C.clua_atpanic(L.s, C.uint(fid)))
 	switch i := oldres.(type) {
 	case C.uint:
-		f := L.registry[uint(i)].(LuaGoFunction)
+		f := L.shared.registry[uint(i)].(LuaGoFunction)
 		// free registry entry
-		L.unregister(uint(i))
+		L.shared.unregister(uint(i))
 		return f
 	case C.lua_CFunction:
 		return func(L1 *State) int {
@@ -302,7 +302,7 @@ func (L *State) CheckStack(extra int) bool {
 // [lua_close]: https://www.lua.org/manual/5.1/manual.html#lua_close
 func (L *State) Close() {
 	C.lua_close(L.s)
-	unregisterGoState(L)
+	unregisterGoState(L.Index)
 }
 
 // [lua_concat] -> [-n, +1, e]
@@ -446,7 +446,7 @@ func (L *State) IsUserdata(index int) bool { return C.lua_isuserdata(L.s, C.int(
 func NewStateAlloc(f Alloc) *State {
 	ls := C.clua_newstate(unsafe.Pointer(&f))
 	L := newState(ls)
-	L.allocfn = &f
+	L.shared.allocfn = &f
 	return L
 }
 
@@ -465,11 +465,14 @@ func (L *State) NewTable() {
 //
 // [lua_newthread]: https://www.lua.org/manual/5.1/manual.html#lua_newthread
 func (L *State) NewThread() *State {
-	// TODO: call newState with result from C.lua_newthread and return it
-	// TODO: should have same lists as parent
-	//		but may complicate gc
+	// The returned wrapper shares the parent's bookkeeping (function registry,
+	// free-list, hook) via the same sharedState, so Go functions pushed/called
+	// on the thread resolve exactly as on the parent, while all stack operations
+	// target the thread's own lua_State. The wrapper is intentionally NOT
+	// registered in goStates: C->Go dispatch resolves the sharedState via the
+	// shared key and re-wraps the calling lua_State (see getGoStateForThread).
 	s := C.lua_newthread(L.s)
-	return &State{s, 0, nil, nil, nil, nil, nil}
+	return &State{s: s, Index: L.Index, shared: L.shared}
 }
 
 // [lua_next] -> [-1, +(2|0), e]
@@ -634,8 +637,8 @@ func (L *State) RegisterLibrary(name string, funcs map[string]LuaGoFunction) {
 //
 // [lua_setallocf]: https://www.lua.org/manual/5.1/manual.html#lua_setallocf
 func (L *State) SetAllocf(f Alloc) {
-	L.allocfn = &f
-	C.clua_setallocf(L.s, unsafe.Pointer(L.allocfn))
+	L.shared.allocfn = &f
+	C.clua_setallocf(L.s, unsafe.Pointer(L.shared.allocfn))
 }
 
 // [lua_setfield] -> [-1, +0, e]
@@ -703,7 +706,7 @@ func (L *State) ToGoFunction(index int) (f LuaGoFunction) {
 	if fid < 0 {
 		return nil
 	}
-	return L.registry[fid].(LuaGoFunction)
+	return L.shared.registry[fid].(LuaGoFunction)
 }
 
 // Returns the value at index as a Go Struct (it must be something pushed with PushGoStruct)
@@ -715,7 +718,7 @@ func (L *State) ToGoStruct(index int) (f interface{}) {
 	if fid < 0 {
 		return nil
 	}
-	return L.registry[fid]
+	return L.shared.registry[fid]
 }
 
 // [lua_tostring] -> [-0, +0, m]
@@ -830,7 +833,10 @@ func (L *State) OpenOS() {
 // Sets the lua hook (lua_sethook).
 // This and SetExecutionLimit are mutual exclusive
 func (L *State) SetHook(f HookFunction, instrNumber int) {
-	L.hookFn = f
+	// The hook function is bookkeeping shared by all threads of the VM
+	// (hooks live in the VM's global_State); store it on the sharedState so a
+	// hook installed via a thread wrapper is found by the C->Go dispatch.
+	L.shared.hookFn = f
 	C.clua_sethook(L.s, C.int(instrNumber))
 }
 
