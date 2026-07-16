@@ -76,7 +76,13 @@ int callback_function(lua_State* L)
 	size_t gostateindex = clua_getgostate(L);
 	//remove the go function from the stack (to present same behavior as lua_CFunctions)
 	lua_remove(L,1);
-	return golua_callgofunction(gostateindex, fid!=NULL ? *fid : -1);
+	r = golua_callgofunction(gostateindex, L, fid!=NULL ? *fid : -1);
+	// r < 0: the Go side recovered a panic and pushed the error value;
+	// raise it from C so the longjmp stays inside the VM (no Go panic may
+	// unwind across the in-flight lua_pcall/lua_resume frames).
+	if (r < 0)
+		return lua_error(L);
+	return r;
 }
 
 //wrapper for gchook
@@ -112,9 +118,13 @@ void clua_pushgofunction(lua_State* L, unsigned int fid)
 
 static int callback_c (lua_State* L)
 {
+	int r;
 	int fid = clua_togofunction(L,lua_upvalueindex(1));
 	size_t gostateindex = clua_getgostate(L);
-	return golua_callgofunction(gostateindex,fid);
+	r = golua_callgofunction(gostateindex,L,fid);
+	if (r < 0)
+		return lua_error(L);
+	return r;
 }
 
 void clua_pushcallback(lua_State* L, unsigned int nup)
@@ -165,7 +175,7 @@ int interface_index_callback(lua_State *L)
 
 	size_t gostateindex = clua_getgostate(L);
 
-	int r = golua_interface_index_callback(gostateindex, *iid, field_name);
+	int r = golua_interface_index_callback(gostateindex, L, *iid, field_name);
 
 	if (r < 0)
 	{
@@ -197,7 +207,7 @@ int interface_newindex_callback(lua_State *L)
 
 	size_t gostateindex = clua_getgostate(L);
 
-	int r = golua_interface_newindex_callback(gostateindex, *iid, field_name);
+	int r = golua_interface_newindex_callback(gostateindex, L, *iid, field_name);
 
 	if (r < 0)
 	{
@@ -213,8 +223,10 @@ int interface_newindex_callback(lua_State *L)
 int panic_msghandler(lua_State *L)
 {
 	size_t gostateindex = clua_getgostate(L);
-	go_panic_msghandler(gostateindex, (char *)lua_tolstring(L, -1, NULL));
-	return 0;
+	// Go side captures the stack trace while the erroring stack is alive and
+	// returns normally; keep the original error value as the handler result.
+	go_panic_msghandler(gostateindex, L);
+	return 1;
 }
 
 void clua_hide_pcall(lua_State *L)
@@ -275,7 +287,7 @@ int callback_panicf(lua_State* L)
 	unsigned int fid = lua_tointeger(L,-1);
 	lua_pop(L,1);
 	size_t gostateindex = clua_getgostate(L);
-	return golua_callpanicfunction(gostateindex,fid);
+	return golua_callpanicfunction(gostateindex,L,fid);
 
 }
 
@@ -343,7 +355,10 @@ void clua_hook_function(lua_State *L, lua_Debug *ar)
 {
 	lua_checkstack(L, 2);
 	size_t gostateindex = clua_getgostate(L);
-	golua_callgohook(gostateindex);
+	// non-zero: the Go hook recovered a panic (e.g. SetExecutionLimit) and
+	// pushed the error value; raise it from C inside the VM's own unwinding.
+	if (golua_callgohook(gostateindex, L))
+		lua_error(L);
 }
 
 void clua_sethook(lua_State* L, int n)

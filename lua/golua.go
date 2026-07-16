@@ -14,6 +14,7 @@ import "C"
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 	"unsafe"
@@ -35,12 +36,28 @@ const ExecutionQuantumExceeded = "Lua execution quantum exceeded"
 //
 //export State
 type State struct {
-	// Wrapped lua_State object
+	// Wrapped lua_State object: the per-thread execution stack (the main
+	// state or one coroutine thread).
 	s *C.lua_State
 
-	// index of this object inside the goStates array
+	// key of the owning sharedState inside the goStates map (equal to the
+	// address of that sharedState). All threads of a VM share this value.
 	Index uintptr
 
+	// shared points to the VM-wide Go-side bookkeeping shared by the main
+	// state and every coroutine thread wrapper of that VM. It is the same
+	// instance for all of them, so there is no per-thread copy to touch by
+	// mistake: every registry/free-list/hook/ctx access goes through here.
+	shared *sharedState
+}
+
+// sharedState holds the Go-side bookkeeping owned by a Lua VM and shared by
+// its main state and every coroutine thread wrapper. Exactly one instance per
+// VM lives in the goStates map; State is a thin per-thread wrapper pointing at
+// it. Keeping it a distinct type means a stray direct field access on a thread
+// wrapper is impossible (the fields simply do not exist on State) rather than a
+// silent read of an empty per-thread slice.
+type sharedState struct {
 	// Registry of go object that have been pushed to Lua VM
 	registry []interface{}
 
@@ -54,60 +71,159 @@ type State struct {
 	hookFn HookFunction
 
 	ctx context.Context
+
+	// pendingTrace holds the Lua stack trace captured while the erroring
+	// stack was still alive (by the message handler, or at the point a Go
+	// panic was converted to a lua_error). callEx consumes it to build the
+	// LuaError after lua_pcall has already unwound the stack.
+	pendingTrace []LuaStackEntry
+
+	// pendingPanic preserves the ORIGINAL value recovered from a panicking
+	// Go callback (RaiseError's *LuaError, a user's custom error, ...) while
+	// the error itself travels through the VM as a regular lua_error.
+	// callEx returns this original value — matched via pendingPanicMsg
+	// against the error string on the stack — so existing Go code observes
+	// exactly the pre-fix results from Call/DoString. If a Lua-level pcall
+	// catches the error instead, the stale value is discarded by the
+	// message-mismatch guard on the next error.
+	pendingPanic    interface{}
+	pendingPanicMsg string
+}
+
+// getGoStateForThread resolves a *State wrapper for the actual calling
+// lua_State. C->Go dispatch identifies the VM by the goStates key stored in the
+// registry (shared by all coroutine threads of that VM); a fresh wrapper is
+// synthesized around the CALLING lua_State so the Go callback reads arguments
+// from and pushes results onto the correct stack, while all bookkeeping is
+// reached through the shared sharedState. The wrapper is transient (one per
+// dispatch, main state included): no caching, hence no invalidation hazard when
+// threads are collected; the allocation is noise next to the cgo crossing.
+func getGoStateForThread(gostateindex uintptr, ls *C.lua_State) *State {
+	sh := getGoState(gostateindex)
+	if sh == nil {
+		return nil
+	}
+	return &State{s: ls, Index: gostateindex, shared: sh}
 }
 
 var (
-	goStates      map[uintptr]*State
+	goStates      map[uintptr]*sharedState
 	goStatesMutex sync.Mutex
 )
 
 func init() {
-	goStates = make(map[uintptr]*State, 16)
+	goStates = make(map[uintptr]*sharedState, 16)
 }
 
-func registerGoState(L *State) {
+// registerGoState stores the VM's sharedState in the goStates map, keyed by its
+// own address, and returns that key for the main state's Index. The key
+// round-trips through C as an opaque size_t (never converted back to a Go
+// pointer), so it is used solely as the map lookup key on the way back.
+func registerGoState(sh *sharedState) uintptr {
 	goStatesMutex.Lock()
 	defer goStatesMutex.Unlock()
-	L.Index = uintptr(unsafe.Pointer(L))
-	goStates[L.Index] = L
+	idx := uintptr(unsafe.Pointer(sh))
+	goStates[idx] = sh
+	return idx
 }
 
-func unregisterGoState(L *State) {
+func unregisterGoState(idx uintptr) {
 	goStatesMutex.Lock()
 	defer goStatesMutex.Unlock()
-	delete(goStates, L.Index)
+	delete(goStates, idx)
 }
 
-func getGoState(gostateindex uintptr) *State {
+func getGoState(gostateindex uintptr) *sharedState {
 	goStatesMutex.Lock()
 	defer goStatesMutex.Unlock()
 	return goStates[gostateindex]
 }
 
+// pushRecoveredError converts a value recovered from a panicking Go callback
+// into a Lua error value on top of L's stack and returns the sentinel -1 that
+// tells the C trampoline to raise it with lua_error. Raising from C keeps the
+// longjmp entirely inside the Lua VM: a Go panic must never unwind across the
+// in-flight lua_pcall/lua_resume C frames, as that abandons the VM's internal
+// call chain and corrupts the state (the error is then only observable as a
+// later crash). The stack trace is preserved via pendingTrace for callEx.
+func (L *State) pushRecoveredError(r interface{}) int {
+	sh := L.shared
+	L.CheckStack(1)
+	var msg string
+	switch e := r.(type) {
+	case *LuaError:
+		sh.pendingTrace = e.stackTrace
+		msg = e.message
+	case error:
+		sh.pendingTrace = L.StackTrace()
+		msg = e.Error()
+	default:
+		sh.pendingTrace = L.StackTrace()
+		msg = fmt.Sprintf("panic: %v", r)
+	}
+	sh.pendingPanic = r
+	sh.pendingPanicMsg = msg
+	L.PushString(msg)
+	return -1
+}
+
 //export golua_callgofunction
-func golua_callgofunction(gostateindex uintptr, fid uint) int {
-	L1 := getGoState(gostateindex)
+func golua_callgofunction(gostateindex uintptr, ls *C.lua_State, fid uint) (nret int) {
+	// ls is the lua_State the call actually happens on: the main state or a
+	// coroutine thread. The Go function must see THAT stack (its arguments
+	// live there), while the function registry is looked up on the main state.
+	L1 := getGoStateForThread(gostateindex, ls)
+	// Contain any panic (RaiseError or accidental) at the cgo boundary and
+	// let the C trampoline raise it as a regular lua_error instead of
+	// unwinding through the VM's C frames (see pushRecoveredError).
+	defer func() {
+		if r := recover(); r != nil {
+			nret = L1.pushRecoveredError(r)
+		}
+	}()
 	if fid < 0 {
 		panic(&LuaError{0, "Requested execution of an unknown function", L1.StackTrace()})
 	}
-	f := L1.registry[fid].(LuaGoFunction)
+	f := L1.shared.registry[fid].(LuaGoFunction)
 	return f(L1)
 }
 
 //export golua_callgohook
-func golua_callgohook(gostateindex uintptr) {
-	L1 := getGoState(gostateindex)
-	if L1.hookFn != nil {
-		L1.hookFn(L1)
+func golua_callgohook(gostateindex uintptr, ls *C.lua_State) (raise int) {
+	// Deliver the hook on the thread it fired on (correct stack for
+	// inspection); the hook function itself is shared VM bookkeeping.
+	L1 := getGoStateForThread(gostateindex, ls)
+	if L1 == nil {
+		return 0
 	}
+	// A panicking hook (e.g. SetExecutionLimit's RaiseError) must not unwind
+	// across the VM's C frames either: convert it to a lua_error raised by
+	// the C hook wrapper, which resolves inside the interrupted pcall/resume.
+	defer func() {
+		if r := recover(); r != nil {
+			L1.pushRecoveredError(r)
+			raise = 1
+		}
+	}()
+	if hf := L1.shared.hookFn; hf != nil {
+		hf(L1)
+	}
+	return 0
 }
 
 var typeOfBytes = reflect.TypeOf([]byte(nil))
 
 //export golua_interface_newindex_callback
-func golua_interface_newindex_callback(gostateindex uintptr, iid uint, field_name_cstr *C.char) int {
-	L := getGoState(gostateindex)
-	iface := L.registry[iid]
+func golua_interface_newindex_callback(gostateindex uintptr, ls *C.lua_State, iid uint, field_name_cstr *C.char) (r int) {
+	L := getGoStateForThread(gostateindex, ls)
+	// Contain reflect panics (Elem on a non-pointer, Set on a wrong kind, ...)
+	// like any other Go panic: the C wrapper raises the pushed value on r < 0.
+	defer func() {
+		if rec := recover(); rec != nil {
+			r = L.pushRecoveredError(rec)
+		}
+	}()
+	iface := L.shared.registry[iid]
 	ifacevalue := reflect.ValueOf(iface).Elem()
 
 	field_name := C.GoString(field_name_cstr)
@@ -200,9 +316,16 @@ func golua_interface_newindex_callback(gostateindex uintptr, iid uint, field_nam
 }
 
 //export golua_interface_index_callback
-func golua_interface_index_callback(gostateindex uintptr, iid uint, field_name *C.char) int {
-	L := getGoState(gostateindex)
-	iface := L.registry[iid]
+func golua_interface_index_callback(gostateindex uintptr, ls *C.lua_State, iid uint, field_name *C.char) (r int) {
+	L := getGoStateForThread(gostateindex, ls)
+	// Contain reflect panics (Elem on a non-pointer, ...) like any other Go
+	// panic: the C wrapper raises the pushed value on r < 0.
+	defer func() {
+		if rec := recover(); rec != nil {
+			r = L.pushRecoveredError(rec)
+		}
+	}()
+	iface := L.shared.registry[iid]
 	ifacevalue := reflect.ValueOf(iface).Elem()
 
 	fval := ifacevalue.FieldByName(C.GoString(field_name))
@@ -262,15 +385,15 @@ func golua_interface_index_callback(gostateindex uintptr, iid uint, field_name *
 
 //export golua_gchook
 func golua_gchook(gostateindex uintptr, id uint) int {
-	L1 := getGoState(gostateindex)
-	L1.unregister(id)
+	sh := getGoState(gostateindex)
+	sh.unregister(id)
 	return 0
 }
 
 //export golua_callpanicfunction
-func golua_callpanicfunction(gostateindex uintptr, id uint) int {
-	L1 := getGoState(gostateindex)
-	f := L1.registry[id].(LuaGoFunction)
+func golua_callpanicfunction(gostateindex uintptr, ls *C.lua_State, id uint) int {
+	L1 := getGoStateForThread(gostateindex, ls)
+	f := L1.shared.registry[id].(LuaGoFunction)
 	return f(L1)
 }
 
@@ -290,9 +413,12 @@ func golua_callallocf(fp uintptr, ptr uintptr, osize uint, nsize uint) uintptr {
 }
 
 //export go_panic_msghandler
-func go_panic_msghandler(gostateindex uintptr, z *C.char) {
-	L := getGoState(gostateindex)
-	s := C.GoString(z)
-
-	panic(&LuaError{LUA_ERRERR, s, L.StackTrace()})
+func go_panic_msghandler(gostateindex uintptr, ls *C.lua_State) {
+	// Runs as lua_pcall's message handler while the erroring stack is still
+	// alive: capture the trace for callEx and return normally. Panicking here
+	// (the old behavior) unwound a Go panic across the in-flight lua_pcall —
+	// the corruption class this file now exists to prevent. The error value
+	// itself stays on the stack as the handler's result.
+	L := getGoStateForThread(gostateindex, ls)
+	L.shared.pendingTrace = L.StackTrace()
 }
