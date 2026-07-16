@@ -1,8 +1,47 @@
 package lua
 
 import (
+	"context"
 	"testing"
 )
+
+// TestContextVisibleAcrossStacks verifies that the context set via
+// NewStateWithContext is visible through L.Context() inside a Go callback
+// regardless of which stack invoked it. The "main" row is a regression guard
+// (a callback on the main state must still see the context now that dispatch
+// always synthesizes a fresh wrapper); the "coroutine" row pins the newly
+// consistent behavior (before the sharedState refactor a coroutine wrapper had
+// no context and Context() returned nil there).
+func TestContextVisibleAcrossStacks(t *testing.T) {
+	type ctxKey struct{}
+	want := context.WithValue(context.Background(), ctxKey{}, "req-42")
+
+	cases := []struct{ name, driver string }{
+		{"main", `f()`},
+		{"coroutine", `coroutine.wrap(function() f() end)()`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			L := NewStateWithContext(want)
+			defer L.Close()
+			L.OpenLibs()
+
+			var got context.Context
+			var ran bool
+			L.Register("f", func(L *State) int { ran = true; got = L.Context(); return 0 })
+
+			if err := L.DoString(tc.driver); err != nil {
+				t.Fatal(err)
+			}
+			if !ran {
+				t.Fatalf("callback f never ran for %s driver", tc.name)
+			}
+			if got != want {
+				t.Fatalf("Context() inside %s callback = %v, want %v", tc.name, got, want)
+			}
+		})
+	}
+}
 
 // The tests in this file cover thread-correct dispatch of Go callbacks: a Go
 // function (or hook) invoked from a coroutine must receive a *State bound to

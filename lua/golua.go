@@ -35,12 +35,28 @@ const ExecutionQuantumExceeded = "Lua execution quantum exceeded"
 //
 //export State
 type State struct {
-	// Wrapped lua_State object
+	// Wrapped lua_State object: the per-thread execution stack (the main
+	// state or one coroutine thread).
 	s *C.lua_State
 
-	// index of this object inside the goStates array
+	// key of the owning sharedState inside the goStates map (equal to the
+	// address of that sharedState). All threads of a VM share this value.
 	Index uintptr
 
+	// shared points to the VM-wide Go-side bookkeeping shared by the main
+	// state and every coroutine thread wrapper of that VM. It is the same
+	// instance for all of them, so there is no per-thread copy to touch by
+	// mistake: every registry/free-list/hook/ctx access goes through here.
+	shared *sharedState
+}
+
+// sharedState holds the Go-side bookkeeping owned by a Lua VM and shared by
+// its main state and every coroutine thread wrapper. Exactly one instance per
+// VM lives in the goStates map; State is a thin per-thread wrapper pointing at
+// it. Keeping it a distinct type means a stray direct field access on a thread
+// wrapper is impossible (the fields simply do not exist on State) rather than a
+// silent read of an empty per-thread slice.
+type sharedState struct {
 	// Registry of go object that have been pushed to Lua VM
 	registry []interface{}
 
@@ -54,66 +70,52 @@ type State struct {
 	hookFn HookFunction
 
 	ctx context.Context
-
-	// main points to the State that owns the Go-side bookkeeping (function
-	// registry, free-list, hook function). It is nil for the main state
-	// itself and non-nil for coroutine thread wrappers (created by NewThread
-	// or synthesized by the C->Go dispatch when a Go function or hook is
-	// invoked on a coroutine's lua_State). Thread wrappers share the parent's
-	// Index and are never registered in goStates; all registry mutations are
-	// delegated to main so that function ids stay valid across threads.
-	main *State
 }
 
-// mainState returns the State that owns the Go-side bookkeeping: the receiver
-// itself for a main state, or the creating state for a coroutine thread
-// wrapper. All registry/free-list/hook accesses must go through it.
-func (L *State) mainState() *State {
-	if L.main != nil {
-		return L.main
-	}
-	return L
-}
-
-// getGoStateForThread resolves the *State wrapper for the actual calling
-// lua_State. C->Go dispatch identifies the VM by the registry-stored index of
-// the main state (shared by all coroutine threads of that VM); when the
-// calling lua_State is a coroutine, a transient wrapper is synthesized so the
-// Go callback reads arguments from and pushes results onto the CORRECT stack.
-// The wrapper is transient (one per dispatch): no caching, hence no
-// invalidation hazard when threads are collected; the allocation is noise
-// next to the cgo crossing itself.
+// getGoStateForThread resolves a *State wrapper for the actual calling
+// lua_State. C->Go dispatch identifies the VM by the goStates key stored in the
+// registry (shared by all coroutine threads of that VM); a fresh wrapper is
+// synthesized around the CALLING lua_State so the Go callback reads arguments
+// from and pushes results onto the correct stack, while all bookkeeping is
+// reached through the shared sharedState. The wrapper is transient (one per
+// dispatch, main state included): no caching, hence no invalidation hazard when
+// threads are collected; the allocation is noise next to the cgo crossing.
 func getGoStateForThread(gostateindex uintptr, ls *C.lua_State) *State {
-	M := getGoState(gostateindex)
-	if M == nil || M.s == ls {
-		return M
+	sh := getGoState(gostateindex)
+	if sh == nil {
+		return nil
 	}
-	return &State{s: ls, Index: M.Index, main: M}
+	return &State{s: ls, Index: gostateindex, shared: sh}
 }
 
 var (
-	goStates      map[uintptr]*State
+	goStates      map[uintptr]*sharedState
 	goStatesMutex sync.Mutex
 )
 
 func init() {
-	goStates = make(map[uintptr]*State, 16)
+	goStates = make(map[uintptr]*sharedState, 16)
 }
 
-func registerGoState(L *State) {
+// registerGoState stores the VM's sharedState in the goStates map, keyed by its
+// own address, and returns that key for the main state's Index. The key
+// round-trips through C as an opaque size_t (never converted back to a Go
+// pointer), so it is used solely as the map lookup key on the way back.
+func registerGoState(sh *sharedState) uintptr {
 	goStatesMutex.Lock()
 	defer goStatesMutex.Unlock()
-	L.Index = uintptr(unsafe.Pointer(L))
-	goStates[L.Index] = L
+	idx := uintptr(unsafe.Pointer(sh))
+	goStates[idx] = sh
+	return idx
 }
 
-func unregisterGoState(L *State) {
+func unregisterGoState(idx uintptr) {
 	goStatesMutex.Lock()
 	defer goStatesMutex.Unlock()
-	delete(goStates, L.Index)
+	delete(goStates, idx)
 }
 
-func getGoState(gostateindex uintptr) *State {
+func getGoState(gostateindex uintptr) *sharedState {
 	goStatesMutex.Lock()
 	defer goStatesMutex.Unlock()
 	return goStates[gostateindex]
@@ -128,7 +130,7 @@ func golua_callgofunction(gostateindex uintptr, ls *C.lua_State, fid uint) int {
 	if fid < 0 {
 		panic(&LuaError{0, "Requested execution of an unknown function", L1.StackTrace()})
 	}
-	f := L1.mainState().registry[fid].(LuaGoFunction)
+	f := L1.shared.registry[fid].(LuaGoFunction)
 	return f(L1)
 }
 
@@ -140,7 +142,7 @@ func golua_callgohook(gostateindex uintptr, ls *C.lua_State) {
 	if L1 == nil {
 		return
 	}
-	if hf := L1.mainState().hookFn; hf != nil {
+	if hf := L1.shared.hookFn; hf != nil {
 		hf(L1)
 	}
 }
@@ -150,7 +152,7 @@ var typeOfBytes = reflect.TypeOf([]byte(nil))
 //export golua_interface_newindex_callback
 func golua_interface_newindex_callback(gostateindex uintptr, ls *C.lua_State, iid uint, field_name_cstr *C.char) int {
 	L := getGoStateForThread(gostateindex, ls)
-	iface := L.mainState().registry[iid]
+	iface := L.shared.registry[iid]
 	ifacevalue := reflect.ValueOf(iface).Elem()
 
 	field_name := C.GoString(field_name_cstr)
@@ -245,7 +247,7 @@ func golua_interface_newindex_callback(gostateindex uintptr, ls *C.lua_State, ii
 //export golua_interface_index_callback
 func golua_interface_index_callback(gostateindex uintptr, ls *C.lua_State, iid uint, field_name *C.char) int {
 	L := getGoStateForThread(gostateindex, ls)
-	iface := L.mainState().registry[iid]
+	iface := L.shared.registry[iid]
 	ifacevalue := reflect.ValueOf(iface).Elem()
 
 	fval := ifacevalue.FieldByName(C.GoString(field_name))
@@ -305,15 +307,15 @@ func golua_interface_index_callback(gostateindex uintptr, ls *C.lua_State, iid u
 
 //export golua_gchook
 func golua_gchook(gostateindex uintptr, id uint) int {
-	L1 := getGoState(gostateindex)
-	L1.unregister(id)
+	sh := getGoState(gostateindex)
+	sh.unregister(id)
 	return 0
 }
 
 //export golua_callpanicfunction
 func golua_callpanicfunction(gostateindex uintptr, ls *C.lua_State, id uint) int {
 	L1 := getGoStateForThread(gostateindex, ls)
-	f := L1.mainState().registry[id].(LuaGoFunction)
+	f := L1.shared.registry[id].(LuaGoFunction)
 	return f(L1)
 }
 
