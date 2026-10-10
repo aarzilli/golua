@@ -209,7 +209,9 @@ func (L *State) PushGoStruct(iface interface{}) {
 
 // Push a pointer onto the stack as user data.
 //
-// This function doesn't save a reference to the interface, it is the responsibility of the caller of this function to insure that the interface outlasts the lifetime of the lua object that this function creates.
+// This function doesn't save a reference to the interface, it is the responsibility of the caller of this function to insure that the [cgo pointer passing rules] are respected.
+//
+// [cgo pointer passing rules]: https://pkg.go.dev/cmd/cgo#hdr-Passing_pointers
 func (L *State) PushLightUserdata(ud *interface{}) {
 	// push
 	C.lua_pushlightuserdata(L.s, unsafe.Pointer(ud))
